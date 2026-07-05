@@ -1,0 +1,7 @@
+exclude = [
+    'https://www.figma.com/.*',
+    'https://gitlab.pg.innopolis.university/.*',
+    'https://t.me/.*',
+    'https://docs.google.com/.*',
+    'http://10\.93\.26\.179/.*'
+]

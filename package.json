@@ -1,0 +1,47 @@
+{
+  "name": "swp",
+  "version": "1.0.0",
+  "description": "A frontend-only web application (HTML/JS/CSS) designed to help children practice English pronunciation using the browser's native Web Speech API and Text-to-Speech API.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test:qrt": "playwright test",
+    "test:unit": "jest --coverage",
+    "test:unit:watch": "jest --watch",
+    "test": "jest --coverage",
+    "serve": "serve -l 3000"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["<rootDir>/tests/unit/**/*.test.js"],
+    "collectCoverageFrom": [
+      "games/shared/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 30,
+        "functions": 30,
+        "branches": 30,
+        "statements": 30
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.pg.innopolis.university/swp-voice-games/vg-mvp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "serve": "^14.2.6",
+    "wait-on": "^9.0.10",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}

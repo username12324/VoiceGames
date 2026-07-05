@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Coloring Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f0f1a; color: #fff; font-family: 'Segoe UI', sans-serif; }
+        .bg-card { background-color: rgba(26, 26, 46, 0.95); backdrop-filter: blur(10px); }
+        .bg-inner { background-color: #141426; }
+
+        .colorable {
+            cursor: pointer;
+            transition: fill 0.25s ease;
+            stroke: #1a1a1a;
+            stroke-width: 2.2px;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+        .colorable:hover {
+            stroke: #ff2d75;
+            stroke-width: 3.2px;
+        }
+        .static-line { stroke: #1a1a1a; stroke-width: 2px; fill: none; pointer-events: none; }
+
+        
+        @keyframes pulse {
+            0%   { transform: scale(1);    box-shadow: 0 0 0 0   rgba(233, 30, 99, 0.7); }
+            70%  { transform: scale(1.1);  box-shadow: 0 0 0 15px rgba(233, 30, 99, 0); }
+            100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(233, 30, 99, 0); }
+        }
+    </style>
+    <script src="../shared/wordlists.js"></script>
+    <script src="../shared/utils.js"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <a href="../../play.html" style="position:fixed;top:16px;left:16px;z-index:50;display:flex;align-items:center;gap:8px;background:#1a1a2e;border:1px solid #333;color:#ccc;padding:8px 16px;border-radius:50px;font-size:0.85em;font-weight:700;text-decoration:none;transition:all 0.2s" onmouseover="this.style.borderColor='#e91e63';this.style.color='#e91e63'" onmouseout="this.style.borderColor='#333';this.style.color='#ccc'">← Menu</a>
+
+    <div class="max-w-5xl w-full">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black uppercase tracking-widest italic">THE <span class="text-pink-500">COLORING</span> GAME</h1>
+            <p class="text-gray-500 text-xs font-bold uppercase tracking-[3px] mt-1">Match The House Using Your Voice</p>
+        </div>
+
+        <div class="bg-card rounded-[3.5rem] p-10 border-2 border-gray-800 shadow-2xl">
+
+            <div class="mb-6 flex items-center justify-between">
+                <div class="text-sm font-bold uppercase text-gray-400">Match Progress</div>
+                <div class="flex items-center gap-4">
+                    <div id="progress-text" class="text-lg font-black">0%</div>
+                    <div class="w-48 bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div id="progress-bar" class="bg-pink-500 h-3 w-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-10 mb-10">
+
+                <!-- YOUR CANVAS -->
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-black text-gray-600 uppercase tracking-[3px] mb-4">Your Canvas</span>
+                    <div class="bg-white rounded-[2.5rem] p-6 aspect-square w-full flex items-center justify-center border-4 border-gray-900 shadow-2xl overflow-hidden">
+                    <svg viewBox="0 0 220 200" class="w-full h-full">
+                    <path id="u-sky" class="colorable" fill-rule="evenodd" fill="transparent"
+                    d="M0,0 H220 V150 H0 Z
+                    M55,150 V95 H45 L110,40 L175,95 H165 V150 Z
+                    M24,40 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z" />
+
+                    <path id="u-ground" class="colorable" fill-rule="evenodd" fill="transparent"
+                    d="M0,150 H220 V200 H0 Z
+                    M103,150 L117,150 L127,196 L93,196 Z" />
+
+                    <polygon id="u-roof" class="colorable" points="45,95 110,40 175,95" fill="transparent" />
+
+                    <path id="u-wall" class="colorable" fill-rule="evenodd" fill="transparent"
+                    d="M55,95 H165 V150 H55 Z
+                    M70,108 H95 V130 H70 Z
+                    M125,108 H150 V130 H125 Z
+                    M100,115 H120 V150 H100 Z" />
+
+                    <rect id="u-door" class="colorable" x="100" y="115" width="20" height="35" fill="transparent" />
+                    <rect id="u-window-l" class="colorable" x="70" y="108" width="25" height="22" fill="transparent" />
+                    <rect id="u-window-r" class="colorable" x="125" y="108" width="25" height="22" fill="transparent" />
+                    <circle id="u-sun" class="colorable" cx="40" cy="40" r="16" fill="transparent" />
+                    <polygon id="u-path" class="colorable" points="103,150 117,150 127,196 93,196" fill="transparent" />
+
+                    <line class="static-line" x1="82.5" y1="108" x2="82.5" y2="130" />
+                    <line class="static-line" x1="70" y1="119" x2="95" y2="119" />
+                    <line class="static-line" x1="137.5" y1="108" x2="137.5" y2="130" />
+                    <line class="static-line" x1="125" y1="119" x2="150" y2="119" />
+                    <circle cx="115" cy="133" r="2" fill="#1a1a1a" pointer-events="none" />
+                    </svg>
+                    </div>
+                </div>
+
+                <!-- GOAL REFERENCE -->
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-black text-gray-600 uppercase tracking-[3px] mb-4">Goal Reference</span>
+                    <div class="bg-white rounded-[2.5rem] p-6 aspect-square w-full flex items-center justify-center border-4 border-gray-200">
+                    <svg viewBox="0 0 220 200" class="w-full h-full">
+                    <path fill-rule="evenodd" fill="#22d3ee" stroke="#1a1a1a" stroke-width="2.2"
+                    d="M0,0 H220 V150 H0 Z M55,150 V95 H45 L110,40 L175,95 H165 V150 Z M24,40 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z" />
+                    <path fill-rule="evenodd" fill="#22c55e" stroke="#1a1a1a" stroke-width="2.2"
+                    d="M0,150 H220 V200 H0 Z M103,150 L117,150 L127,196 L93,196 Z" />
+                    <polygon points="45,95 110,40 175,95" fill="#ef4444" stroke="#1a1a1a" stroke-width="2.2" />
+                    <path fill-rule="evenodd" fill="#facc15" stroke="#1a1a1a" stroke-width="2.2"
+                    d="M55,95 H165 V150 H55 Z M70,108 H95 V130 H70 Z M125,108 H150 V130 H125 Z M100,115 H120 V150 H100 Z" />
+                    <rect x="100" y="115" width="20" height="35" fill="#78350f" stroke="#1a1a1a" stroke-width="2.2" />
+                    <rect x="70" y="108" width="25" height="22" fill="#3b82f6" stroke="#1a1a1a" stroke-width="2.2" />
+                    <rect x="125" y="108" width="25" height="22" fill="#3b82f6" stroke="#1a1a1a" stroke-width="2.2" />
+                    <circle cx="40" cy="40" r="16" fill="#fde047" stroke="#1a1a1a" stroke-width="2.2" />
+                    <polygon points="103,150 117,150 127,196 93,196" fill="#9ca3af" stroke="#1a1a1a" stroke-width="2.2" />
+                    <line x1="82.5" y1="108" x2="82.5" y2="130" stroke="#1a1a1a" stroke-width="2" />
+                    <line x1="70" y1="119" x2="95" y2="119" stroke="#1a1a1a" stroke-width="2" />
+                    <line x1="137.5" y1="108" x2="137.5" y2="130" stroke="#1a1a1a" stroke-width="2" />
+                    <line x1="125" y1="119" x2="150" y2="119" stroke="#1a1a1a" stroke-width="2" />
+                    <circle cx="115" cy="133" r="2" fill="#1a1a1a" />
+                    </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTROLS -->
+            <div class="bg-inner p-6 rounded-[3rem] border-2 border-gray-800">
+                <div class="text-center mb-3">
+                    <div class="text-[10px] font-black text-gray-600 uppercase tracking-[3px] mb-2">🎤 Say this to activate the brush</div>
+                    <div id="heard-color" style="font-size:1.75rem;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;font-style:italic;color:#ec4899;text-shadow:0 0 24px currentColor;line-height:1.1;transition:color 0.3s">TAP A COLOR TO START</div>
+                    <div id="heard-color-ru" style="font-size:1.05rem;font-style:italic;font-weight:700;color:#a78bfa;margin-top:6px;letter-spacing:0.03em;min-height:1.3em"></div>
+                    <div id="mic-status" class="text-[10px] font-bold text-gray-500 uppercase mt-2"></div>
+                </div>
+                <div class="grid grid-cols-4 gap-3" id="color-buttons">
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#22d3ee" data-name="cyan" data-ru="бирюзовый" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#22d3ee"></span> Cyan
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#22c55e" data-name="green" data-ru="зелёный" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#22c55e"></span> Green
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#ef4444" data-name="red" data-ru="красный" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#ef4444"></span> Red
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#facc15" data-name="yellow" data-ru="жёлтый" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#facc15"></span> Yellow
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#78350f" data-name="brown" data-ru="коричневый" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#78350f"></span> Brown
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#3b82f6" data-name="blue" data-ru="синий" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#3b82f6"></span> Blue
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#9ca3af" data-name="gray" data-ru="серый" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#9ca3af"></span> Gray
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button class="color-word-btn flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-gray-700 hover:border-pink-500 bg-gray-900 transition-all font-bold text-xs uppercase" data-color="#f97316" data-name="orange" data-ru="оранжевый" onclick="selectColorBtn(this)">
+                      <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:#f97316"></span> Orange
+                    </button>
+                  </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const heardText = document.getElementById('heard-color');
+        const heardTextRu = document.getElementById('heard-color-ru');
+        const micStatus = document.getElementById('mic-status');
+        const colorables = document.querySelectorAll('.colorable');
+        const progressText = document.getElementById('progress-text');
+        const progressBar = document.getElementById('progress-bar');
+
+        let currentColor = null;
+        let selectedTiles = new Set();
+
+        const colorMap = {
+            'cyan': '#22d3ee',
+            'green': '#22c55e',
+            'dark green': '#166534',
+            'red': '#ef4444',
+            'dark red': '#991b1b',
+            'yellow': '#facc15',
+            'brown': '#78350f',
+            'blue': '#3b82f6',
+            'gray': '#9ca3af',
+            'grey': '#9ca3af',
+            'orange': '#f97316',
+            'purple': '#a855f7',
+            'pink': '#ec4899',
+            'white': '#ffffff',
+            'black': '#1f2937'
+        };
+
+        const expectedNameById = {
+            'u-sky': 'cyan',
+            'u-ground': 'green',
+            'u-roof': 'red',
+            'u-wall': 'yellow',
+            'u-door': 'brown',
+            'u-window-l': 'blue',
+            'u-window-r': 'blue',
+            'u-sun': 'yellow',
+            'u-path': 'gray'
+        };
+
+        const matched = {};
+        Object.keys(expectedNameById).forEach(id => matched[id] = false);
+        const totalTargets = Object.keys(expectedNameById).length;
+
+        // ── TOPIC WORD ASSIGNMENT ──────────────────────
+        // Each color button gets a word/phrase from the selected topic's
+        // shared sentence pool (same pool Voice Angler / Spell Match-3 use).
+        // Say the assigned word/phrase — NOT the color name — to paint.
+        const selectedTopicId = (typeof vgGetSelectedTopic === 'function') ? vgGetSelectedTopic() : 'fantasy';
+        const activeTopic = (typeof vgGetTopic === 'function') ? vgGetTopic(selectedTopicId) : null;
+        const topicPool = (activeTopic && activeTopic.sentences && activeTopic.sentences.length)
+            ? activeTopic.sentences
+            : [{ text: 'say it', ru: '', alts: ['say it'] }];
+
+        const colorButtons = Array.from(document.querySelectorAll('.color-word-btn'));
+        colorButtons.forEach((btn, i) => {
+            const phrase = topicPool[i % topicPool.length];
+            btn.dataset.phraseText = phrase.text;
+            btn.dataset.phraseAlts = JSON.stringify(phrase.alts || [phrase.text]);
+            btn.dataset.phraseRu = phrase.ru || '';
+            // Update the visible label to show the word to say, colors stay as swatches
+            const labelSpan = btn.querySelector('span');
+            if (labelSpan) {
+                btn.title = 'Say: ' + phrase.text;
+            }
+        });
+
+        function updateProgress() {
+            const correctCount = Object.keys(matched).filter(k => matched[k]).length;
+            const pct = Math.round((correctCount / totalTargets) * 100);
+            progressText.innerText = pct + '%';
+            progressBar.style.width = pct + '%';
+            if (pct === 100) showCongrats();
+        }
+
+        function showCongrats() {
+            if (document.getElementById('congrats-overlay')) return;
+            if (window.VG) { VG.saveScore('color-match', 100); }
+            const overlay = document.createElement('div');
+            overlay.id = 'congrats-overlay';
+            overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:9999';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#0b1020;border:2px solid #ff2d75;padding:28px;border-radius:18px;text-align:center;color:white;width:min(380px,90%)';
+            const title = document.createElement('div');
+            title.style.cssText = 'font-size:20px;font-weight:800;margin-bottom:12px';
+            title.innerText = 'CONGRATULATIONS!';
+            const sub = document.createElement('div');
+            sub.style.marginBottom = '18px';
+            sub.innerText = 'You matched the goal image — 100%';
+            const btn = document.createElement('button');
+            btn.innerText = 'Play Again';
+            btn.style.cssText = 'background:#ff2d75;border:none;color:white;padding:10px 18px;border-radius:8px;cursor:pointer';
+            btn.onclick = () => { document.body.removeChild(overlay); resetGame(); };
+            box.appendChild(title); box.appendChild(sub); box.appendChild(btn);
+            overlay.appendChild(box); document.body.appendChild(overlay);
+        }
+
+        function resetGame() {
+            colorables.forEach(el => {
+                el.style.fill = 'transparent';
+                el.style.stroke = '';
+                el.style.strokeWidth = '';
+                delete el.dataset.current;
+                el.dataset.selected = 'false';
+            });
+            Object.keys(matched).forEach(k => matched[k] = false);
+            selectedTiles.clear();
+            updateProgress();
+            currentColor = null;
+            heardText.innerText = 'TAP A COLOR TO START';
+            heardText.style.color = '';
+            heardTextRu.innerHTML = '';
+            micStatus.innerText = '';
+            if (activeBtn) { activeBtn.classList.remove('border-pink-500', 'bg-pink-950'); activeBtn = null; }
+        }
+
+        function paintSelectedTiles(color) {
+            selectedTiles.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.style.fill = color;
+                    el.style.stroke = '';
+                    el.style.strokeWidth = '';
+                    el.dataset.current = color.toLowerCase();
+                    el.dataset.selected = 'false';
+                    const expectedName = expectedNameById[id];
+                    const expectedHex = expectedName ? (colorMap[expectedName] || '').toLowerCase() : null;
+                    if (expectedName) matched[id] = !!(expectedHex && color.toLowerCase() === expectedHex);
+                }
+            });
+            selectedTiles.clear();
+            updateProgress();
+        }
+
+        function clearTileSelection() {
+            selectedTiles.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.style.stroke = ''; el.style.strokeWidth = ''; el.dataset.selected = 'false'; }
+            });
+            selectedTiles.clear();
+        }
+
+        let activeBtn = null;
+
+        function selectColorBtn(btn) {
+            if (activeBtn) activeBtn.classList.remove('border-pink-500', 'bg-pink-950');
+            activeBtn = btn;
+            btn.classList.add('border-pink-500', 'bg-pink-950');
+
+            const colorHex = btn.dataset.color;
+            const phraseText = btn.dataset.phraseText;
+            const phraseAlts = JSON.parse(btn.dataset.phraseAlts || '[]');
+            let phraseRu = btn.dataset.phraseRu || '';
+            if (phraseRu) phraseRu = phraseRu.charAt(0).toUpperCase() + phraseRu.slice(1);
+
+            heardText.innerText = phraseText.toUpperCase();
+            heardText.style.color = colorHex;
+            heardTextRu.innerHTML = phraseRu ? '<span style="font-size:0.7rem;font-weight:900;letter-spacing:0.12em;color:#a78bfa;background:rgba(167,139,250,0.15);padding:2px 6px;border-radius:5px;font-style:normal;vertical-align:middle;margin-right:7px">RU</span>' + phraseRu : '';
+            micStatus.innerText = '🔊 Listen...';
+
+            currentTarget = null;
+            pausedForTTS = true;
+            if (rec) { try { rec.stop(); } catch(e) {} }
+
+            pendingTarget = { phrase: { text: phraseText, alts: phraseAlts }, color: colorHex };
+            speakPhrase(phraseText, () => {
+                pausedForTTS = false;
+                const target = pendingTarget;
+                pendingTarget = null;
+                startListeningFor(target.phrase, target.color);
+            });
+        }
+
+        // ── SPEECH RECOGNITION (single instance) ─────
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let rec = null;
+        let currentTarget = null;
+        let pausedForTTS = false;
+        let pendingTarget = null;
+
+        function initRec() {
+            if (!SR) { micStatus.innerText = '❌ Use Chrome or Edge'; return false; }
+            if (rec) return true;
+            rec = new SR();
+            rec.lang = 'en-US';
+            rec.continuous = true;
+            rec.interimResults = false;
+
+            rec.onresult = (e) => {
+                if (!currentTarget) return;
+                const text = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
+                const { phrase, color } = currentTarget;
+
+                // Strict match: transcript must contain the target phrase
+                // as a whole-word match AND phrase must cover ≥40% of what was said
+                function strictMatch(transcript, phrase) {
+                    const t = transcript.toLowerCase().trim();
+                    const targets = [phrase.text, ...(phrase.alts || [])].map(s => s.toLowerCase());
+                    return targets.some(target => {
+                        const re = new RegExp('\\b' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+                        if (!re.test(t)) return false;
+                        // phrase must be at least 40% of the spoken words
+                        const spokenWords = t.split(/\s+/).length;
+                        const targetWords = target.split(/\s+/).length;
+                        return targetWords / spokenWords >= 0.4;
+                    });
+                }
+                const isMatch = strictMatch(text, phrase);
+
+                if (isMatch) {
+                    currentColor = color;
+                    heardText.style.color = color;
+                    if (window.VG && typeof VG.recordWordSaid === 'function') {
+                        VG.recordWordSaid(selectedTopicId, phrase.text);
+                    }
+                    if (selectedTiles.size > 0) {
+                        paintSelectedTiles(color);
+                        micStatus.innerText = '✅ Painted! Select more tiles or pick another color.';
+                    } else {
+                        micStatus.innerText = '✅ Word recognized! Tap tiles to select, then say it again.';
+                    }
+                }
+            };
+
+            rec.onerror = (e) => {
+                if (e.error === 'not-allowed') micStatus.innerText = '❌ Mic permission denied';
+            };
+
+            rec.onend = () => { if (!pausedForTTS) { try { rec.start(); } catch(e) {} } };
+
+            try { rec.start(); } catch(e) {}
+            return true;
+        }
+
+        function startListeningFor(phrase, targetColor) {
+            if (!initRec()) return;
+            currentTarget = { phrase, color: targetColor };
+            micStatus.innerText = '🎤 Say "' + phrase.text + '" to activate brush...';
+            try { rec.start(); } catch(e) {}
+        }
+
+        // ── VOICE-OVER — speak the target word/phrase aloud ─────
+        function speakPhrase(text, onDone) {
+            if (!('speechSynthesis' in window)) { if (onDone) setTimeout(onDone, 0); return; }
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(text);
+            utt.lang = 'en-US';
+            utt.onend = () => { if (onDone) setTimeout(onDone, 300); };
+            window.speechSynthesis.speak(utt);
+        }
+
+        // ── TILE CLICK: multi-select ──────────────────
+        colorables.forEach(el => {
+            const id = el.id;
+            el.style.cursor = 'pointer';
+            el.dataset.selected = 'false';
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                if (el.dataset.selected === 'true') {
+                    el.dataset.selected = 'false';
+                    el.style.stroke = '';
+                    el.style.strokeWidth = '';
+                    selectedTiles.delete(id);
+                } else {
+                    el.dataset.selected = 'true';
+                    el.style.stroke = '#ff2d75';
+                    el.style.strokeWidth = '4';
+                    selectedTiles.add(id);
+                }
+
+                const count = selectedTiles.size;
+                if (count > 0) {
+                    micStatus.innerText = count + ' tile' + (count > 1 ? 's' : '') + ' selected — say the word to paint!';
+                } else {
+                    micStatus.innerText = currentColor ? '✅ Word active — tap tiles to select.' : '🎤 Pick a color first.';
+                }
+            });
+        });
+
+        updateProgress();
+    </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+
+package "Browser (Client)" {
+  [Main Menu UI] as Menu
+  [Color Match Game] as Game1
+  [Spell Caster Game] as Game2
+  [Speech Manager] as Speech
+  [State Manager] as State
+}
+
+database "LocalStorage" as DB
+
+cloud "Browser APIs" {
+  [Web Speech API] as WSA
+  [Text-to-Speech API] as TTS
+}
+
+Menu --> Game1 : Navigate
+Menu --> Game2 : Navigate
+Game1 --> Speech : Request recognition
+Game2 --> Speech : Request recognition
+Speech --> WSA : Audio stream
+Speech --> TTS : Playback
+Game1 --> State : Save progress
+Game2 --> State : Save progress
+State --> DB : Store JSON
+@enduml

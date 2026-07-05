@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Angler — VoiceGames</title>
+  <meta name="description"
+    content="Cast your line, wait for a bite, then say the phrase to reel in the fish! A fun voice-powered fishing game for English learners.">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Press+Start+2P&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ══════════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════════ */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #060d1a;
+      color: #fff;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ══════════════════════════════════════════════════
+   BACK-TO-MENU BUTTON (matches Spell Match-3 style)
+══════════════════════════════════════════════════ */
+    .menu-btn {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(6, 18, 40, 0.95);
+      border: 1px solid rgba(64, 180, 255, 0.35);
+      color: #7ecfff;
+      padding: 7px 15px;
+      border-radius: 50px;
+      font-size: 0.8em;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all .2s;
+      backdrop-filter: blur(12px);
+    }
+
+    .menu-btn:hover {
+      border-color: #40b4ff;
+      color: #b0e4ff;
+      box-shadow: 0 0 14px rgba(64, 180, 255, 0.25);
+    }
+
+    /* ══════════════════════════════════════════════════
+   HUD — top stats bar
+══════════════════════════════════════════════════ */
+    .hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 160px 10px 160px;
+      background: linear-gradient(180deg, rgba(4, 14, 32, 0.97) 0%, rgba(4, 14, 32, 0.0) 100%);
+      pointer-events: none;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.52em;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .stat-value {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.7em;
+      color: #7ecfff;
+    }
+
+    .fish-count-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(64, 180, 255, 0.12);
+      border: 1px solid rgba(64, 180, 255, 0.3);
+      border-radius: 50px;
+      padding: 4px 14px;
+    }
+
+    .fish-count-badge .stat-value {
+      font-size: 0.65em;
+    }
+
+    /* ══════════════════════════════════════════════════
+   SCENE — lake background
+══════════════════════════════════════════════════ */
+    .scene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    /* Sky gradient */
+    .sky {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg,
+          #0a1628 0%, #0f2244 35%, #122a52 55%, #1a3a6e 70%, #1d4a7a 80%,
+          #1a5a8a 88%, #12688a 95%, #0f7090 100%);
+    }
+
+    /* Animated stars */
+    .stars-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 65%;
+      pointer-events: none;
+    }
+
+    .star {
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+      animation: twinkle var(--dur, 3s) ease-in-out infinite var(--delay, 0s);
+    }
+
+    @keyframes twinkle {
+
+      0%,
+      100% {
+        opacity: var(--min-op, 0.2);
+      }
+
+      50% {
+        opacity: var(--max-op, 0.9);
+      }
+    }
+
+    /* Moon */
+    .moon {
+      position: absolute;
+      top: 40px;
+      right: 12%;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 38%, #f5e9c0, #e8c96a);
+      box-shadow: 0 0 40px rgba(240, 210, 100, 0.5), 0 0 80px rgba(240, 210, 100, 0.2);
+    }
+
+    /* Mountains/hills silhouettes */
+    .hills {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 42%;
+      pointer-events: none;
+    }
+
+    .hill-back {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      background: linear-gradient(180deg, #0a1a2e 0%, #081526 100%);
+      clip-path: polygon(0% 100%,
+          0% 52%,
+          5% 48%, 10% 42%, 14% 38%, 18% 35%,
+          22% 38%, 26% 32%, 30% 25%,
+          34% 30%, 38% 28%, 42% 22%,
+          46% 30%, 50% 36%, 54% 30%,
+          58% 24%, 62% 28%, 66% 32%,
+          70% 26%, 74% 30%, 78% 34%,
+          82% 38%, 86% 36%, 90% 40%,
+          94% 44%, 98% 48%, 100% 50%,
+          100% 100%);
+    }
+
+    .hill-front {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 35%;
+      background: linear-gradient(180deg, #061020 0%, #050e1a 100%);
+      clip-path: polygon(0% 100%,
+          0% 60%,
+          8% 52%, 15% 45%, 22% 50%,
+          28% 42%, 35% 55%, 42% 48%,
+          50% 40%, 56% 48%, 62% 42%,
+          68% 52%, 75% 46%, 82% 55%,
+          88% 50%, 94% 58%, 100% 52%,
+          100% 100%);
+    }
+
+    /* ── WATER ── */
+    .water {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 32%;
+      background: linear-gradient(180deg,
+          #083050 0%, #062444 40%, #041a34 100%);
+      overflow: hidden;
+    }
+
+    /* Water shimmer waves */
+    .wave {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, transparent, rgba(64, 180, 255, 0.15), transparent);
+      animation: waveMove var(--wdur, 6s) ease-in-out infinite var(--wdelay, 0s);
+    }
+
+    @keyframes waveMove {
+
+      0%,
+      100% {
+        transform: translateX(-5%) scaleX(1.1);
+        opacity: 0.4;
+      }
+
+      50% {
+        transform: translateX(5%) scaleX(0.95);
+        opacity: 0.7;
+      }
+    }
+
+    /* Water surface sparkle */
+    .water-surface {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg,
+          transparent 0%, rgba(100, 200, 255, 0.35) 25%,
+          transparent 50%, rgba(100, 200, 255, 0.25) 75%, transparent 100%);
+      animation: surfaceShimmer 4s ease-in-out infinite;
+    }
+
+    @keyframes surfaceShimmer {
+
+      0%,
+      100% {
+        opacity: 0.4;
+      }
+
+      50% {
+        opacity: 0.9;
+      }
+    }
+
+    /* ── UNDERWATER FISH (decorative) ── */
+    .deco-fish {
+      position: absolute;
+      font-size: 1.4em;
+      opacity: 0.2;
+      animation: swimBy var(--sd, 12s) linear infinite var(--sdelay, 0s);
+      top: var(--sy, 40%);
+    }
+
+    @keyframes swimBy {
+      0% {
+        transform: translateX(-8vw) scaleX(1);
+      }
+
+      49% {
+        transform: translateX(108vw) scaleX(1);
+      }
+
+      50% {
+        transform: translateX(108vw) scaleX(-1);
+      }
+
+      100% {
+        transform: translateX(-8vw) scaleX(-1);
+      }
+    }
+
+    /* ── FISHERMAN BOAT (replaces former dock/pier) ── */
+    .boat {
+      position: absolute;
+      bottom: 30%;
+      left: 2%;
+      width: 260px;
+      pointer-events: none;
+      filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5));
+      /* bob animation removed for stable rope attachment */
+    }
+    .boat img { width: 100%; height: auto; display: block; }
+    @keyframes boatBob {
+      0%, 100% { transform: translateY(0) rotate(-1deg); }
+      50% { transform: translateY(-7px) rotate(1deg); }
+    }
+    .swim-fish {
+      position: absolute;
+      font-size: 1.8em;
+      z-index: 12;
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(100, 200, 255, 0.4));
+    }
+    .boat-wake {
+      position: absolute;
+      bottom: -6px;
+      left: 8%;
+      width: 84%;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(100, 200, 255, 0.25), transparent 70%);
+      animation: wakePulse 3.4s ease-in-out infinite;
+    }
+    @keyframes wakePulse {
+      0%, 100% { opacity: 0.5; transform: scaleX(1); }
+      50% { opacity: 0.8; transform: scaleX(1.08); }
+    }
+
+    /* ── FISHING ROD ── */
+    .rod-container {
+      position: absolute;
+      /* placed via JS / inline style */
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .rod-svg {
+      overflow: visible;
+    }
+
+    /* ── BOBBER ── */
+    .bobber {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 35%,
+          #ff9999 0%, #e82020 45%, #8a0000 100%);
+      box-shadow:
+        inset 3px 3px 0 rgba(255, 200, 200, 0.55),
+        inset -2px -2px 0 rgba(0, 0, 0, 0.45),
+        0 3px 10px rgba(220, 0, 30, 0.45);
+      cursor: pointer;
+      transition: transform 0.1s;
+      z-index: 15;
+      display: none;
+      /* shown after cast */
+    }
+
+    .bobber::after {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 7px;
+      background: linear-gradient(180deg, #aaa, #666);
+      border-radius: 2px;
+    }
+
+    /* White reflection on bobber */
+    .bobber::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      width: 6px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Bob animation when idle */
+    .bobber.floating {
+      animation: bobFloat 2.2s ease-in-out infinite;
+    }
+
+    @keyframes bobFloat {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+
+    /* Bite alert animation */
+    .bobber.bite {
+      animation: biteJerk 0.35s ease-in-out infinite;
+    }
+
+    @keyframes biteJerk {
+
+      0%,
+      100% {
+        transform: translateY(0) rotate(-8deg);
+      }
+
+      25% {
+        transform: translateY(6px) rotate(8deg);
+      }
+
+      75% {
+        transform: translateY(-3px) rotate(-4deg);
+      }
+    }
+
+    /* Ripple rings around bobber */
+    .bobber-ripple {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(100, 200, 255, 0.5);
+      pointer-events: none;
+      animation: rippleOut 1.8s ease-out infinite;
+      z-index: 14;
+    }
+
+    @keyframes rippleOut {
+      0% {
+        width: 22px;
+        height: 22px;
+        opacity: 0.6;
+      }
+
+      100% {
+        width: 80px;
+        height: 80px;
+        opacity: 0;
+      }
+    }
+
+    /* ── CLICK RIPPLE on water ── */
+    .click-ripple {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(100, 200, 255, 0.7);
+      pointer-events: none;
+      animation: clickRippleOut 0.8s ease-out forwards;
+      z-index: 13;
+    }
+
+    @keyframes clickRippleOut {
+      0% {
+        width: 10px;
+        height: 10px;
+        opacity: 1;
+      }
+
+      100% {
+        width: 80px;
+        height: 80px;
+        opacity: 0;
+      }
+    }
+
+    /* ── CAST HINT ── */
+    .cast-hint {
+      position: absolute;
+      bottom: 36%;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+      z-index: 20;
+      transition: opacity 0.4s;
+    }
+
+    .cast-hint-text {
+      font-size: 0.9em;
+      font-weight: 700;
+      color: rgba(200, 230, 255, 0.6);
+      animation: hintPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes hintPulse {
+
+      0%,
+      100% {
+        opacity: 0.5;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    .cast-hint-arrow {
+      font-size: 1.4em;
+      animation: hintPulse 2s ease-in-out infinite 0.5s;
+    }
+
+    /* ══════════════════════════════════════════════════
+   PHRASE CHALLENGE PANEL (bottom sheet)
+══════════════════════════════════════════════════ */
+    .challenge-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 300;
+      background: linear-gradient(180deg, #060f20 0%, #04080f 100%);
+      border-top: 2px solid rgba(64, 180, 255, 0.4);
+      padding: 16px 20px 20px;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(.22, .68, 0, 1.2);
+      max-width: 540px;
+      margin: 0 auto;
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -10px 40px rgba(0, 80, 160, 0.35);
+    }
+
+    .challenge-panel.visible {
+      transform: translateY(0);
+    }
+
+    /* Shimmer top border */
+    .challenge-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #40b4ff, #00cfff, transparent);
+      animation: borderShimmer 2s linear infinite;
+    }
+
+    @keyframes borderShimmer {
+      0% {
+        background-position: -200% 0
+      }
+
+      100% {
+        background-position: 200% 0
+      }
+    }
+
+    .panel-rarity {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .rarity-badge {
+      font-size: 0.6em;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 3px 12px;
+      border-radius: 50px;
+    }
+
+    .rarity-common {
+      background: rgba(78, 205, 196, 0.2);
+      color: #4ecdc4;
+      border: 1px solid rgba(78, 205, 196, 0.4);
+    }
+
+    .rarity-uncommon {
+      background: rgba(100, 200, 100, 0.2);
+      color: #6fde6f;
+      border: 1px solid rgba(100, 200, 100, 0.4);
+    }
+
+    .rarity-rare {
+      background: rgba(64, 120, 255, 0.2);
+      color: #6fa8ff;
+      border: 1px solid rgba(64, 120, 255, 0.4);
+    }
+
+    .rarity-epic {
+      background: rgba(155, 89, 182, 0.2);
+      color: #d4a4ff;
+      border: 1px solid rgba(155, 89, 182, 0.4);
+    }
+
+    .rarity-legendary {
+      background: rgba(255, 170, 0, 0.2);
+      color: #ffd93d;
+      border: 1px solid rgba(255, 170, 0, 0.5);
+      box-shadow: 0 0 12px rgba(255, 200, 0, 0.3);
+      animation: legendaryGlow 1s ease-in-out infinite;
+    }
+
+    @keyframes legendaryGlow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 12px rgba(255, 200, 0, 0.3);
+      }
+
+      50% {
+        box-shadow: 0 0 25px rgba(255, 200, 0, 0.6);
+      }
+    }
+
+    .fish-preview {
+      font-size: 2.4em;
+      line-height: 1;
+    }
+
+    .phrase-label {
+      font-size: 0.6em;
+      color: rgba(255, 255, 255, 0.38);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .phrase-text {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.78em;
+      color: #e8f6ff;
+      text-align: center;
+      padding: 12px 10px;
+      background: rgba(64, 180, 255, 0.08);
+      border-radius: 10px;
+      border: 1px solid rgba(64, 180, 255, 0.25);
+      line-height: 1.7;
+      margin-bottom: 10px;
+      text-shadow: 0 0 14px rgba(100, 200, 255, 0.5);
+      letter-spacing: 1px;
+    }
+
+    /* Timer */
+    .timer-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .timer-track {
+      flex: 1;
+      height: 7px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #0066cc, #40b4ff);
+      transition: width 0.1s linear, background 0.4s;
+    }
+
+    .timer-fill.urgent {
+      background: linear-gradient(90deg, #c0392b, #ff6b6b);
+    }
+
+    .timer-num {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65em;
+      color: #40b4ff;
+      min-width: 20px;
+      text-align: right;
+    }
+
+    .timer-num.urgent {
+      color: #ff6b6b;
+    }
+
+    /* Mic row */
+    .mic-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+
+    .mic-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1a6eb5, #0a4480);
+      border: 2px solid rgba(64, 180, 255, 0.5);
+      font-size: 1.6em;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(64, 180, 255, 0.4);
+      transition: all .15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.08);
+    }
+
+    .mic-btn.listening {
+      background: linear-gradient(135deg, #0095d8, #005fa0);
+      animation: micRing 1s ease-in-out infinite;
+    }
+
+    @keyframes micRing {
+      0% {
+        box-shadow: 0 0 0 0 rgba(64, 180, 255, 0.8);
+      }
+
+      70% {
+        box-shadow: 0 0 0 18px rgba(64, 180, 255, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(64, 180, 255, 0);
+      }
+    }
+
+    .mic-hint {
+      font-size: 0.72em;
+      color: rgba(255, 255, 255, 0.4);
+      font-weight: 700;
+    }
+
+    .mic-hint.active {
+      color: #40b4ff;
+    }
+
+    .interim-text {
+      font-size: 0.7em;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: center;
+      font-style: italic;
+      min-height: 16px;
+      margin-top: 4px;
+    }
+
+    .feedback-row {
+      text-align: center;
+      font-size: 0.8em;
+      font-weight: 700;
+      min-height: 20px;
+      padding: 4px 0;
+    }
+
+    .feedback-row.correct {
+      color: #2ecc71;
+    }
+
+    .feedback-row.wrong {
+      color: #e74c3c;
+    }
+
+    .feedback-row.info {
+      color: #f1c40f;
+    }
+
+    /* ══════════════════════════════════════════════════
+   FISH JOURNAL OVERLAY
+══════════════════════════════════════════════════ */
+    .journal-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(6, 18, 40, 0.95);
+      border: 1px solid rgba(64, 180, 255, 0.35);
+      color: #7ecfff;
+      padding: 7px 15px;
+      border-radius: 50px;
+      font-size: 0.8em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      backdrop-filter: blur(12px);
+    }
+
+    .journal-btn:hover {
+      border-color: #40b4ff;
+      color: #b0e4ff;
+      box-shadow: 0 0 14px rgba(64, 180, 255, 0.25);
+    }
+
+    .journal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(2, 8, 18, 0.92);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .journal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .journal-panel {
+      background: linear-gradient(160deg, #060f22, #04080f);
+      border: 1px solid rgba(64, 180, 255, 0.3);
+      border-radius: 20px;
+      padding: 24px;
+      width: min(520px, 94vw);
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 0 60px rgba(0, 80, 160, 0.4), 0 0 0 1px rgba(64, 180, 255, 0.15);
+      transform: translateY(20px);
+      transition: transform 0.3s;
+    }
+
+    .journal-overlay.open .journal-panel {
+      transform: translateY(0);
+    }
+
+    .journal-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.8em;
+      color: #7ecfff;
+      text-align: center;
+      margin-bottom: 4px;
+      text-shadow: 0 0 20px rgba(64, 180, 255, 0.5);
+    }
+
+    .journal-sub {
+      text-align: center;
+      font-size: 0.75em;
+      color: rgba(255, 255, 255, 0.35);
+      margin-bottom: 20px;
+    }
+
+    .journal-section {
+      margin-bottom: 18px;
+    }
+
+    .journal-section-title {
+      font-size: 0.62em;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .journal-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .fish-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 8px;
+    }
+
+    .fish-card {
+      border-radius: 12px;
+      padding: 10px 6px 8px;
+      text-align: center;
+      border: 1px solid;
+      transition: transform 0.2s;
+    }
+
+    .fish-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .fish-card.caught {
+      background: rgba(64, 180, 255, 0.08);
+      border-color: rgba(64, 180, 255, 0.25);
+    }
+
+    .fish-card.missing {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.08);
+      filter: grayscale(1);
+      opacity: 0.4;
+    }
+
+    .fish-card-emoji {
+      font-size: 1.8em;
+      line-height: 1;
+    }
+
+    .fish-card-name {
+      font-size: 0.6em;
+      font-weight: 700;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .fish-card-rarity {
+      font-size: 0.5em;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .fish-card-count {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45em;
+      margin-top: 4px;
+      color: #40b4ff;
+    }
+
+    .journal-close {
+      display: block;
+      margin: 10px auto 0;
+      background: linear-gradient(135deg, #1a6eb5, #0a4480);
+      border: none;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 0.9em;
+      padding: 10px 30px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(64, 180, 255, 0.3);
+      transition: all 0.2s;
+    }
+
+    .journal-close:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(64, 180, 255, 0.45);
+    }
+
+    /* ══════════════════════════════════════════════════
+   CAUGHT FISH ANIMATION
+══════════════════════════════════════════════════ */
+    .caught-splash {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 350;
+      pointer-events: none;
+      animation: splashIn 0.5s cubic-bezier(.22, .68, 0, 1.35) forwards;
+    }
+
+    @keyframes splashIn {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -40%) scale(0.4);
+      }
+
+      70% {
+        opacity: 1;
+        transform: translate(-50%, -52%) scale(1.15);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .caught-splash.out {
+      animation: splashOut 0.45s ease-in forwards;
+    }
+
+    @keyframes splashOut {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -60%) scale(0.7);
+      }
+    }
+
+    .caught-emoji {
+      font-size: 4em;
+      display: block;
+    }
+
+    .caught-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75em;
+      margin-top: 6px;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(64, 180, 255, 0.8);
+    }
+
+    .caught-rarity-text {
+      font-size: 0.72em;
+      font-weight: 900;
+      margin-top: 4px;
+    }
+
+    /* ══════════════════════════════════════════════════
+   GOT AWAY ANIMATION
+══════════════════════════════════════════════════ */
+    .got-away {
+      position: fixed;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 350;
+      pointer-events: none;
+      animation: gotAwayIn 0.4s ease forwards;
+    }
+
+    @keyframes gotAwayIn {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -40%);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+    }
+
+    .got-away.out {
+      animation: gotAwayOut 0.5s ease-in forwards;
+    }
+
+    @keyframes gotAwayOut {
+      0% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+      }
+    }
+
+    .got-away-emoji {
+      font-size: 2.5em;
+    }
+
+    .got-away-text {
+      font-size: 0.85em;
+      font-weight: 900;
+      margin-top: 6px;
+      color: rgba(255, 100, 80, 0.9);
+    }
+
+    /* ══════════════════════════════════════════════════
+   BITE ALERT INDICATOR
+══════════════════════════════════════════════════ */
+    .bite-alert {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.8em;
+      font-weight: 900;
+      color: #ffd93d;
+      background: rgba(30, 20, 0, 0.85);
+      border: 2px solid rgba(255, 200, 0, 0.6);
+      padding: 8px 20px;
+      border-radius: 50px;
+      z-index: 100;
+      pointer-events: none;
+      display: none;
+      animation: alertPop 0.4s cubic-bezier(.22, .68, 0, 1.35) forwards;
+    }
+
+    @keyframes alertPop {
+      0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+      }
+
+      70% {
+        transform: translate(-50%, -50%) scale(1.15);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════
+   PARTICLES
+══════════════════════════════════════════════════ */
+    .particle {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 999;
+      animation: particleOut 0.7s ease-out forwards;
+    }
+
+    @keyframes particleOut {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(0) translateY(-20px);
+      }
+    }
+
+    /* ══════════════════════════════════════════════════
+   END SCREEN
+══════════════════════════════════════════════════ */
+    .end-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 16, 0.92);
+      z-index: 600;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      backdrop-filter: blur(8px);
+    }
+
+    .end-screen.show {
+      display: flex;
+    }
+
+    .end-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 1.1em;
+      color: #7ecfff;
+      text-align: center;
+      text-shadow: 0 0 35px rgba(64, 180, 255, 0.8), 0 0 70px rgba(64, 180, 255, 0.4);
+      line-height: 1.6;
+    }
+
+    .end-score-wrap {
+      background: rgba(64, 180, 255, 0.1);
+      border: 1px solid rgba(64, 180, 255, 0.3);
+      border-radius: 14px;
+      padding: 14px 28px;
+      text-align: center;
+    }
+
+    .end-score-label {
+      font-size: 0.6em;
+      color: rgba(255, 255, 255, 0.35);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .end-score-val {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.9em;
+      color: #e8f6ff;
+      margin-top: 4px;
+    }
+
+    .end-btns {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .end-btn {
+      background: linear-gradient(135deg, #1a6eb5, #0a4480);
+      border: none;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 1em;
+      padding: 12px 32px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(64, 180, 255, 0.4);
+      transition: all .2s;
+    }
+
+    .end-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(64, 180, 255, 0.55);
+    }
+
+    .end-link {
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 0.82em;
+      text-decoration: none;
+    }
+
+    .end-link:hover {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* ── Scrollbar styling ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(64, 180, 255, 0.3);
+      border-radius: 4px;
+    }
+  </style>
+  <script src="../shared/utils.js"></script>
+  <script src="../shared/wordlists.js"></script>
+</head>
+
+<body>
+
+  <!-- ── BACK TO MENU ── -->
+  <a href="../../play.html" class="menu-btn" id="menuBtn">← Menu</a>
+
+  <!-- ── HUD ── -->
+  <div class="hud">
+    <div class="stat-box">
+      <span class="stat-label">Score</span>
+      <span class="stat-value" id="scoreVal">0</span>
+    </div>
+    <div class="fish-count-badge">
+      <span>🐟</span>
+      <span class="stat-label">Caught:</span>
+      <span class="stat-value" id="caughtVal">0</span>
+      <span class="stat-label">&nbsp;/&nbsp;</span>
+      <span class="stat-value" id="timeVal">90</span>
+      <span class="stat-label">s</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">Best</span>
+      <span class="stat-value" id="bestVal">0</span>
+    </div>
+  </div>
+
+  <!-- ── JOURNAL BUTTON ── -->
+  <button class="journal-btn" id="journalBtn" onclick="openJournal()">📖 Journal</button>
+
+  <!-- ══════════════════════════════════════════════════
+     MAIN SCENE
+══════════════════════════════════════════════════ -->
+  <div class="scene" id="scene">
+
+    <!-- Sky -->
+    <div class="sky">
+      <div class="stars-layer" id="starsLayer"></div>
+      <div class="moon"></div>
+    </div>
+
+    <!-- Hills -->
+    <div class="hills">
+      <div class="hill-back"></div>
+      <div class="hill-front"></div>
+    </div>
+
+    <!-- Water -->
+    <div class="water" id="water">
+      <div class="water-surface"></div>
+      <!-- Waves (created by JS) -->
+      <div class="deco-fish" style="--sd:14s;--sdelay:0s;--sy:40%;">🐡</div>
+      <div class="deco-fish" style="--sd:18s;--sdelay:5s;--sy:60%;">🐠</div>
+      <div class="deco-fish" style="--sd:22s;--sdelay:9s;--sy:30%;">🦈</div>
+      <div class="deco-fish" style="--sd:16s;--sdelay:2s;--sy:75%;">🐟</div>
+    </div>
+
+    <!-- Fisherman boat (replaces former dock/pier) -->
+    <div class="boat" id="boatEl">
+      <div class="boat-wake"></div>
+      <img src="boat.png" alt="Fisherman boat" draggable="false">
+    </div>
+
+    <!-- Fishing rod (drawn via SVG, repositioned by JS) -->
+    <div class="rod-container" id="rodContainer">
+      <svg class="rod-svg" id="rodSvg" width="200" height="200"></svg>
+    </div>
+
+    <!-- Bobber -->
+    <div class="bobber" id="bobber"></div>
+    <!-- Bobber ripple rings -->
+    <div class="bobber-ripple" id="ripple1" style="display:none"></div>
+    <div class="bobber-ripple" id="ripple2" style="display:none; animation-delay:0.6s"></div>
+
+    <!-- Cast hint -->
+    <div class="cast-hint" id="castHint">
+      <div class="cast-hint-arrow">🎣</div>
+      <div class="cast-hint-text">Click the water to cast!</div>
+    </div>
+
+    <!-- Bite alert -->
+    <div class="bite-alert" id="biteAlert">🎣 Fish on! Click the bobber!</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+     CHALLENGE PANEL (bottom sheet)
+══════════════════════════════════════════════════ -->
+  <div class="challenge-panel" id="challengePanel">
+    <div class="panel-rarity">
+      <div class="fish-preview" id="fishPreview">🐟</div>
+      <span class="rarity-badge" id="rarityBadge">Common</span>
+    </div>
+    <div class="phrase-label">🎤 Say this phrase to reel it in!</div>
+    <div class="phrase-text" id="phraseText">reel it in</div>
+    <div class="phrase-ru" id="phraseRu" style="text-align:center;color:#a78bfa;font-size:1.05em;font-weight:700;font-style:italic;margin-top:4px;margin-bottom:8px"></div>
+    <div class="timer-row">
+      <div class="timer-track">
+        <div class="timer-fill" id="timerFill" style="width:100%"></div>
+      </div>
+      <div class="timer-num" id="timerNum">7</div>
+    </div>
+    <div class="mic-row">
+      <button class="mic-btn" id="micBtn" disabled>🎤</button>
+      <span class="mic-hint" id="micHint">Tap mic · then speak!</span>
+    </div>
+    <div class="interim-text" id="interimText"></div>
+    <div class="feedback-row" id="feedback"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+     FISH JOURNAL OVERLAY
+══════════════════════════════════════════════════ -->
+  <div class="journal-overlay" id="journalOverlay">
+    <div class="journal-panel">
+      <div class="journal-title">📖 FISH JOURNAL</div>
+      <div class="journal-sub">Catch them all to complete your collection!</div>
+      <div id="journalContent"></div>
+      <button class="journal-close" onclick="closeJournal()">Close</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+     END SCREEN
+══════════════════════════════════════════════════ -->
+  <div class="end-screen" id="endScreen">
+    <div class="end-title" id="endTitle">🎣 TIME'S UP! 🎣</div>
+    <div class="end-score-wrap">
+      <div class="end-score-label">Final Score</div>
+      <div class="end-score-val" id="endScoreVal">0 pts</div>
+    </div>
+    <div class="end-score-wrap" style="background:rgba(255,200,0,0.08);border-color:rgba(255,200,0,0.3);">
+      <div class="end-score-label">Fish Caught</div>
+      <div class="end-score-val" id="endCaughtVal">0</div>
+    </div>
+    <div class="end-btns">
+      <button class="end-btn" onclick="restartGame()">▶ Play Again</button>
+      <a href="../../play.html" class="end-link">← Back to Menu</a>
+    </div>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════════════════════
+    //  FISH DATABASE — 5 rarities, unique fish per tier
+    //  - Common & Uncommon: 7 seconds to speak
+    //  - Rare: 5 seconds
+    //  - Epic: 4 seconds
+    //  - Legendary: 3 seconds
+    // ══════════════════════════════════════════════════════════════
+    const FISH_DB = [
+      // ── COMMON (7s) ──────────────────────────────────
+      {
+        id: 'c1', name: 'Minnow', emoji: '🐟', rarity: 'common', timer: 7, color: '#4ecdc4', weight: 40,
+        phrase: { text: 'I got it', alts: ['i got it', 'got it', 'i have it', 'got one'], ru: 'Я поймал' }
+      },
+      {
+        id: 'c2', name: 'Carp', emoji: '🐠', rarity: 'common', timer: 7, color: '#4ecdc4', weight: 38,
+        phrase: { text: 'pull it up', alts: ['pull it up', 'pull up', 'reel it up'], ru: 'Тяни вверх' }
+      },
+      {
+        id: 'c3', name: 'Perch', emoji: '🐡', rarity: 'common', timer: 7, color: '#4ecdc4', weight: 36,
+        phrase: { text: 'nice big fish', alts: ['nice big fish', 'big fish now', 'big nice fish'], ru: 'Хорошая большая рыба' }
+      },
+      {
+        id: 'c4', name: 'Roach', emoji: '🐟', rarity: 'common', timer: 7, color: '#4ecdc4', weight: 35,
+        phrase: { text: 'this one mine', alts: ['this one mine', 'this is mine', 'it is mine'], ru: 'Это моё' }
+      },
+
+      // ── UNCOMMON (7s) ─────────────────────────────────
+      {
+        id: 'u1', name: 'Bass', emoji: '🐠', rarity: 'uncommon', timer: 7, color: '#6fde6f', weight: 22,
+        phrase: { text: 'reel it in', alts: ['reel it in', 'reel in now', 'pulling it in'], ru: 'Тяни леску' }
+      },
+      {
+        id: 'u2', name: 'Trout', emoji: '🐡', rarity: 'uncommon', timer: 7, color: '#6fde6f', weight: 20,
+        phrase: { text: 'got a big one', alts: ['got a big one', 'big one here', 'it is big'], ru: 'Поймал большую' }
+      },
+      {
+        id: 'u3', name: 'Bream', emoji: '🐟', rarity: 'uncommon', timer: 7, color: '#6fde6f', weight: 18,
+        phrase: { text: 'hold the line', alts: ['hold the line', 'hold on tight', 'hold it now'], ru: 'Держи леску' }
+      },
+
+      // ── RARE (5s) ─────────────────────────────────────
+      {
+        id: 'r1', name: 'Salmon', emoji: '🐟', rarity: 'rare', timer: 5, color: '#6fa8ff', weight: 10,
+        phrase: { text: 'do not let go', alts: ['do not let go', 'don\'t let go', 'hold on tight', 'keep it tight'], ru: 'Не отпускай' }
+      },
+      {
+        id: 'r2', name: 'Pike', emoji: '🐠', rarity: 'rare', timer: 5, color: '#6fa8ff', weight: 9,
+        phrase: { text: 'pull it hard', alts: ['pull it hard', 'pull hard now', 'hard pull now'], ru: 'Тяни сильно' }
+      },
+      {
+        id: 'r3', name: 'Catfish', emoji: '🐡', rarity: 'rare', timer: 5, color: '#6fa8ff', weight: 8,
+        phrase: { text: 'what a catch', alts: ['what a catch', 'great catch now', 'great catch'], ru: 'Какой улов' }
+      },
+
+      // ── EPIC (4s) ─────────────────────────────────────
+      {
+        id: 'e1', name: 'Swordfish', emoji: '🐡', rarity: 'epic', timer: 4, color: '#d4a4ff', weight: 4,
+        phrase: { text: 'catch of the day', alts: ['catch of the day', 'catch of day', 'best catch today'], ru: 'Улов дня' }
+      },
+      {
+        id: 'e2', name: 'Barracuda', emoji: '🐠', rarity: 'epic', timer: 4, color: '#d4a4ff', weight: 3,
+        phrase: { text: 'hold it tight', alts: ['hold it tight', 'hold tight now', 'grip it tight'], ru: 'Держи крепко' }
+      },
+
+      // ── LEGENDARY (3s) ────────────────────────────────
+      {
+        id: 'l1', name: 'Dragon Fish', emoji: '🐉', rarity: 'legendary', timer: 3, color: '#ffd93d', weight: 2,
+        phrase: { text: 'catch the dragon', alts: ['catch the dragon', 'catch dragon now', 'dragon fish caught'], ru: 'Поймай дракона' }
+      },
+      {
+        id: 'l2', name: 'Kraken Baby', emoji: '🦑', rarity: 'legendary', timer: 3, color: '#ffd93d', weight: 1,
+        phrase: { text: 'it is a kraken', alts: ['it is a kraken', 'a kraken here', 'big kraken now'], ru: 'Это кракен' }
+      },
+    ];
+
+    // ── TOPIC PHRASE OVERRIDE ──────────────────────────────────────
+    // If a non-default topic is selected on wordlists.html, swap each
+    // fish's phrase for one from that topic's shared sentence pool,
+    // cycling through if there are more fish than sentences.
+    (function applyTopicPhrases() {
+      if (typeof vgGetSelectedTopic !== 'function' || typeof vgGetTopic !== 'function') return;
+      const selected = vgGetSelectedTopic();
+      if (selected === 'fantasy') return; // keep original built-in fishing phrases
+      const topic = vgGetTopic(selected);
+      if (!topic || !topic.sentences || !topic.sentences.length) return;
+      FISH_DB.forEach((fish, i) => {
+        const s = topic.sentences[i % topic.sentences.length];
+        fish.phrase = { text: s.text, alts: s.alts, ru: s.ru };
+      });
+    })();
+
+    // Rarity order for journal display
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+    const RARITY_LABELS = {
+      common: '⚪ Common', uncommon: '🟢 Uncommon', rare: '🔵 Rare',
+      epic: '🟣 Epic', legendary: '🟡 Legendary'
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  GAME CONFIG
+    // ══════════════════════════════════════════════════════════════
+    const GAME_DURATION = 90;   // seconds
+    const BITE_DELAY_MIN = 2000; // ms — minimum wait after cast
+    const BITE_DELAY_MAX = 5000; // ms — maximum wait after cast
+    const BITE_WINDOW = 4000; // ms — how long bobber stays in "bite" state before fish escapes
+    const SWIM_DURATION_MIN = 1400; // ms — fastest fish swim time to reach the line
+    const SWIM_DURATION_MAX = 2600; // ms — slowest fish swim time to reach the line
+
+    // ══════════════════════════════════════════════════════════════
+    //  GAME STATE
+    // ══════════════════════════════════════════════════════════════
+    let gamePhase = 'idle';      // idle | casting | waiting | bite | challenge | caught | away
+    let challengeSolved = false;
+    let gameTimeLeft = GAME_DURATION;
+    let score = 0;
+    let totalCaught = 0;
+    let bestScore = 0;
+    let currentFish = null;
+
+    // Fish journal: map fish id → catch count
+    let journal = {};
+    FISH_DB.forEach(f => journal[f.id] = 0);
+
+    // Timers
+    let gameTimer = null;
+    let timerInterval = null;
+    let timerLeft = 0;
+    let biteTimeout = null;
+    let biteEscapeTimeout = null;
+    let swimStartTimeout = null;
+    let swimFishEl = null;
+    let swimRafId = null;
+    let swimStartTime = 0;
+    let swimDurationMs = 0;
+    let swimStartX = 0, swimStartY = 0;
+    let curBobberX = 0, curBobberY = 0;
+
+    // Speech
+    let recognition = null;
+    let listening = false;
+    let speechReady = false;
+
+    // DOM refs (cached after DOMContentLoaded)
+    let bobberEl, ripple1El, ripple2El, rodSvgEl, rodContainerEl;
+    let sceneEl, waterEl, challengePanelEl;
+    let castHintEl, biteAlertEl;
+
+    // Rod tip screen position (updated on each cast)
+    let rodTipX = 0, rodTipY = 0;
+
+    // ══════════════════════════════════════════════════════════════
+    //  SETUP: STARS
+    // ══════════════════════════════════════════════════════════════
+    function buildStars() {
+      const layer = document.getElementById('starsLayer');
+      const count = 80;
+      for (let i = 0; i < count; i++) {
+        const s = document.createElement('div');
+        s.className = 'star';
+        const size = Math.random() < 0.15 ? 2 : 1;
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const dur = 2 + Math.random() * 4;
+        const delay = Math.random() * 5;
+        const minOp = 0.1 + Math.random() * 0.2;
+        const maxOp = 0.6 + Math.random() * 0.4;
+        s.style.cssText = `width:${size}px;height:${size}px;left:${x}%;top:${y}%;
+      --dur:${dur}s;--delay:${delay}s;--min-op:${minOp};--max-op:${maxOp}`;
+        layer.appendChild(s);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  SETUP: WAVES
+    // ══════════════════════════════════════════════════════════════
+    function buildWaves() {
+      for (let i = 0; i < 6; i++) {
+        const w = document.createElement('div');
+        w.className = 'wave';
+        w.style.top = (10 + i * 14) + '%';
+        w.style.setProperty('--wdur', (5 + Math.random() * 4) + 's');
+        w.style.setProperty('--wdelay', (Math.random() * 3) + 's');
+        waterEl.appendChild(w);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  ROD DRAWING
+    // ══════════════════════════════════════════════════════════════
+    /**
+     * Draws the fishing rod SVG from handle to tip, plus the fishing line
+     * that extends to the bobber position.
+     * @param {number} bx — bobber X on screen
+     * @param {number} by — bobber Y on screen
+     */
+    function drawRod(bx, by) {
+      // Rod base: dock edge, bottom-left area
+      const boatRect = document.getElementById('boatEl').getBoundingClientRect();
+      const rodBaseX = boatRect.left + boatRect.width * 0.9975; // aligns to painted rod tip in boat.png
+
+      // Rod tip is angled up-right from the base
+      const tipX = rodBaseX;
+      const tipY = boatRect.top + boatRect.height * -0.15;
+
+      // Store for line drawing
+      rodTipX = tipX;
+      rodTipY = tipY;
+
+      // Position the SVG container
+      rodContainerEl.style.left = (rodBaseX - 20) + 'px';
+      rodContainerEl.style.top = (tipY - 20) + 'px';
+
+      const svgW = Math.abs(bx - rodBaseX) + 80;
+      const svgH = Math.abs(by - tipY) + 80;
+      rodSvgEl.setAttribute('width', svgW);
+      rodSvgEl.setAttribute('height', svgH);
+      rodSvgEl.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+
+      // Local coords relative to rodContainer top-left
+      const localTipX = tipX - (rodBaseX - 20);
+      const localTipY = tipY - (tipY - 20) + 20;
+      const localBobX = bx - (rodBaseX - 20);
+      const localBobY = by - (tipY - 20);
+
+      // Draw only the fishing line (rod body is painted in boat.png)
+      rodSvgEl.innerHTML = `
+    <!-- Fishing line from rod tip in boat image to bobber -->
+    <line x1="${localTipX}" y1="${localTipY}"
+          x2="${localBobX}" y2="${localBobY}"
+          stroke="rgba(200,230,255,0.7)" stroke-width="1.2" stroke-dasharray="0"/>
+  `;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  GAME CLOCK
+    // ══════════════════════════════════════════════════════════════
+    function startGameClock() {
+      gameTimeLeft = GAME_DURATION;
+      updateHUD();
+      clearInterval(gameTimer);
+      gameTimer = setInterval(() => {
+        gameTimeLeft--;
+        updateHUD();
+        if (gameTimeLeft <= 0) {
+          clearInterval(gameTimer);
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function updateHUD() {
+      document.getElementById('scoreVal').textContent = score;
+      document.getElementById('caughtVal').textContent = totalCaught;
+      document.getElementById('timeVal').textContent = gameTimeLeft;
+      document.getElementById('bestVal').textContent = Math.max(bestScore, score);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  WEIGHTED RANDOM FISH SELECTOR
+    // ══════════════════════════════════════════════════════════════
+    // Tracks recently shown fish so the same phrase doesn't repeat back-to-back.
+    // Resets once every fish in the pool has been shown.
+    let recentFishIds = [];
+
+    function pickFish() {
+      let pool = FISH_DB.filter(f => !recentFishIds.includes(f.id));
+      if (pool.length === 0) {
+        // Every fish has been shown recently — reset and use the full pool again
+        recentFishIds = [];
+        pool = FISH_DB;
+      }
+
+      const totalWeight = pool.reduce((sum, f) => sum + f.weight, 0);
+      let r = Math.random() * totalWeight;
+      let chosen = pool[0];
+      for (const fish of pool) {
+        r -= fish.weight;
+        if (r <= 0) { chosen = fish; break; }
+      }
+
+      recentFishIds.push(chosen.id);
+      // Keep the "recently shown" window from growing unbounded relative to pool size
+      const maxRecent = Math.max(1, FISH_DB.length - 1);
+      if (recentFishIds.length > maxRecent) recentFishIds.shift();
+
+      return chosen;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CAST MECHANIC
+    // ══════════════════════════════════════════════════════════════
+    function onWaterClick(e) {
+      if (gamePhase === 'challenge') return;
+      if (gamePhase === 'bite') {
+        // Clicked water (not bobber) during bite — let the fish escape,
+        // then fall through so the click can immediately start a new cast.
+        clearTimeout(biteEscapeTimeout);
+        biteAlertEl.style.display = 'none';
+        hideBobber();
+        gamePhase = 'idle';
+      }
+
+      // During waiting or swimming, re-casting resets
+      if (gamePhase === 'waiting' || gamePhase === 'swimming') {
+        clearTimeout(swimStartTimeout);
+        stopSwimFish();
+        hideBobber();
+      }
+
+      // Idle or re-cast
+      const rect = sceneEl.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      // Only allow clicking in the water zone
+      const waterTop = rect.height * 0.68;
+      if (clickY < waterTop) return;
+
+      // Spawn click ripple effect
+      spawnClickRipple(e.clientX, e.clientY);
+
+      // Position bobber near click point, slightly randomised
+      const bobX = clickX + (Math.random() * 20 - 10);
+      const bobY = clickY - 8;
+
+      castBobber(e.clientX, e.clientY, bobX + rect.left, bobY + rect.top);
+    }
+
+    function castBobber(screenClickX, screenClickY, bobberScreenX, bobberScreenY) {
+      // Hide cast hint
+      castHintEl.style.opacity = '0';
+      gamePhase = 'waiting';
+      curBobberX = bobberScreenX;
+      curBobberY = bobberScreenY;
+
+      // Position bobber
+      bobberEl.style.left = (bobberScreenX - 11) + 'px';
+      bobberEl.style.top = (bobberScreenY - 11) + 'px';
+      bobberEl.className = 'bobber floating';
+      bobberEl.style.display = 'block';
+
+      // Draw rod + line
+      drawRod(bobberScreenX, bobberScreenY);
+
+      // Start continuous line redraw to follow boat bob
+      startLineRedraw();
+
+      // Show ripple rings around bobber
+      positionRipples(bobberScreenX, bobberScreenY);
+      ripple1El.style.display = 'block';
+      ripple2El.style.display = 'block';
+
+      // Schedule fish swim-in after random delay
+      const delay = BITE_DELAY_MIN + Math.random() * (BITE_DELAY_MAX - BITE_DELAY_MIN);
+      swimStartTimeout = setTimeout(() => startFishSwim(), delay);
+    }
+
+    function positionRipples(cx, cy) {
+      [ripple1El, ripple2El].forEach(r => {
+        r.style.left = (cx - 11) + 'px';
+        r.style.top = (cy - 11) + 'px';
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  BITE
+    // ══════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
+    //  FISH SWIM-IN — fish visibly swims toward the line; bite fires
+    //  only on real collision with the rope, not a blind timer.
+    // ══════════════════════════════════════════════════════════════
+    function startFishSwim() {
+      if (gamePhase !== 'waiting') return;
+      gamePhase = 'swimming';
+
+      currentFish = pickFish();
+
+      swimFishEl = document.createElement('div');
+      swimFishEl.className = 'swim-fish';
+      swimFishEl.textContent = currentFish.emoji;
+      sceneEl.appendChild(swimFishEl);
+
+      const rect = sceneEl.getBoundingClientRect();
+      const waterTop = rect.top + rect.height * 0.72;
+      const waterBottom = rect.top + rect.height * 0.94;
+      const fromLeft = Math.random() < 0.5;
+
+      swimStartX = fromLeft ? rect.left - 40 : rect.right + 40;
+      swimStartY = waterTop + Math.random() * (waterBottom - waterTop);
+      swimFishEl.style.transform = `translate(${swimStartX}px, ${swimStartY}px) scaleX(${fromLeft ? 1 : -1})`;
+
+      swimDurationMs = SWIM_DURATION_MIN + Math.random() * (SWIM_DURATION_MAX - SWIM_DURATION_MIN);
+      swimStartTime = performance.now();
+      swimRafId = requestAnimationFrame(swimStep);
+    }
+
+    function swimStep(now) {
+      if (gamePhase !== 'swimming' || !swimFishEl) { swimRafId = null; return; }
+
+      const elapsed = now - swimStartTime;
+      const t = Math.min(1, elapsed / swimDurationMs);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+      const curX = swimStartX + (curBobberX - swimStartX) * eased;
+      const wiggle = Math.sin(elapsed / 140) * 4 * (1 - t);
+      const curY = swimStartY + (curBobberY - swimStartY) * eased + wiggle;
+
+      const facingRight = curBobberX > swimStartX;
+      swimFishEl.style.transform = `translate(${curX}px, ${curY}px) scaleX(${facingRight ? 1 : -1})`;
+
+      // Collision check: bite only when the fish sprite actually
+      // touches the bobber (spec: sprite lands on the bobber).
+      const dist = Math.hypot(curX - curBobberX, curY - curBobberY);
+      if (dist < 24 || t >= 1) {
+        cancelAnimationFrame(swimRafId);
+        swimRafId = null;
+        triggerBite();
+        return;
+      }
+
+      swimRafId = requestAnimationFrame(swimStep);
+    }
+
+    function stopSwimFish() {
+      if (swimRafId) { cancelAnimationFrame(swimRafId); swimRafId = null; }
+      if (swimFishEl) { swimFishEl.remove(); swimFishEl = null; }
+    }
+
+    // Shortest distance from point (px,py) to segment (x1,y1)-(x2,y2)
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function triggerBite() {
+      if (gamePhase !== 'swimming') return;
+      gamePhase = 'bite';
+
+      stopSwimFish();
+
+      // Switch bobber to bite animation + alert
+      bobberEl.className = 'bobber bite';
+      biteAlertEl.style.display = 'block';
+      biteAlertEl.style.animation = 'none';
+      void biteAlertEl.offsetHeight;
+      biteAlertEl.style.animation = 'alertPop 0.4s cubic-bezier(.22,.68,0,1.35) forwards';
+
+      // Play subtle audio cue using Web Audio
+      playBiteSound();
+
+      // Fish escapes if not clicked in time
+      biteEscapeTimeout = setTimeout(() => fishEscaped(), BITE_WINDOW);
+    }
+
+    function onBobberClick(e) {
+      if (gamePhase !== 'bite') return;
+      e.stopPropagation();
+      clearTimeout(biteEscapeTimeout);
+      biteAlertEl.style.display = 'none';
+      showChallenge();
+    }
+
+    function fishEscaped() {
+      if (gamePhase !== 'bite') return;
+      gamePhase = 'away';
+      biteAlertEl.style.display = 'none';
+      hideBobber();
+      showGotAway();
+      setTimeout(() => {
+        gamePhase = 'idle';
+        castHintEl.style.opacity = '1';
+      }, 1800);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CHALLENGE (voice panel)
+    // ══════════════════════════════════════════════════════════════
+    function showChallenge() {
+      gamePhase = 'challenge';
+
+      // Populate panel with fish & phrase
+      document.getElementById('fishPreview').textContent = currentFish.emoji;
+      document.getElementById('phraseText').textContent = currentFish.phrase.text;
+      document.getElementById('phraseRu').textContent = currentFish.phrase.ru ? currentFish.phrase.ru.charAt(0).toUpperCase() + currentFish.phrase.ru.slice(1) : '';
+      challengeSolved = false;
+      speakPhrase(currentFish.phrase.text, () => {
+        if (gamePhase === 'challenge') {
+          if (!speechReady && !initSpeech()) return;
+          try { recognition.start(); } catch (e) {}
+        }
+      });
+
+      // Rarity badge
+      const badge = document.getElementById('rarityBadge');
+      badge.textContent = currentFish.rarity.charAt(0).toUpperCase() + currentFish.rarity.slice(1);
+      badge.className = 'rarity-badge rarity-' + currentFish.rarity;
+
+      // Reset mic/feedback
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('feedback').className = 'feedback-row';
+      document.getElementById('interimText').textContent = '';
+      document.getElementById('micHint').textContent = 'Tap mic · then speak!';
+      document.getElementById('micHint').classList.remove('active');
+
+      // Show panel
+      challengePanelEl.classList.add('visible');
+
+      // Start countdown
+      startChallengeTimer(currentFish.timer);
+    }
+
+    function hideChallenge() {
+      challengePanelEl.classList.remove('visible');
+      stopChallengeTimer();
+      stopListening();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CHALLENGE TIMER
+    // ══════════════════════════════════════════════════════════════
+    function startChallengeTimer(seconds) {
+      timerLeft = seconds;
+      renderChallengeTimer(seconds);
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerLeft -= 0.1;
+        renderChallengeTimer(seconds);
+        if (timerLeft <= 0) {
+          clearInterval(timerInterval);
+          onChallengeTimerExpired();
+        }
+      }, 100);
+    }
+
+    function stopChallengeTimer() { clearInterval(timerInterval); }
+
+    function renderChallengeTimer(totalSec) {
+      const pct = Math.max(0, timerLeft / totalSec) * 100;
+      const fill = document.getElementById('timerFill');
+      const num = document.getElementById('timerNum');
+      fill.style.width = pct + '%';
+      num.textContent = Math.ceil(Math.max(0, timerLeft));
+      const urgent = timerLeft < 2.5;
+      fill.className = 'timer-fill' + (urgent ? ' urgent' : '');
+      num.className = 'timer-num' + (urgent ? ' urgent' : '');
+    }
+
+    function onChallengeTimerExpired() {
+      stopListening();
+      setFeedback('⏰ Too slow! Fish got away.', 'wrong');
+      setTimeout(() => resolveChallenge(false), 1300);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  RESOLVE CHALLENGE — success or failure
+    // ══════════════════════════════════════════════════════════════
+    function resolveChallenge(success) {
+      hideChallenge();
+      hideBobber();
+
+      if (success) {
+        // Record catch
+        journal[currentFish.id]++;
+        const pts = rarityPoints(currentFish.rarity);
+        score += pts;
+        totalCaught++;
+        updateHUD();
+        showCaughtSplash(currentFish, pts);
+        spawnParticles(window.innerWidth / 2, window.innerHeight / 2, currentFish.color);
+      } else {
+        showGotAway();
+      }
+
+      setTimeout(() => {
+        gamePhase = 'idle';
+        castHintEl.style.opacity = '1';
+      }, success ? 2200 : 1800);
+    }
+
+    function rarityPoints(rarity) {
+      return { common: 10, uncommon: 25, rare: 50, epic: 100, legendary: 250 }[rarity] || 10;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  BOBBER HELPERS
+    // ══════════════════════════════════════════════════════════════
+    function hideBobber() {
+      stopLineRedraw();
+      stopSwimFish();
+      bobberEl.style.display = 'none';
+      bobberEl.className = 'bobber';
+      ripple1El.style.display = 'none';
+      ripple2El.style.display = 'none';
+      rodSvgEl.innerHTML = '';
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  LINE REDRAW LOOP — keeps line attached during boat bob animation
+    // ══════════════════════════════════════════════════════════════
+    let lineRafId = null;
+
+    function startLineRedraw() {
+      stopLineRedraw();
+      function loop() {
+        if (gamePhase === 'waiting' || gamePhase === 'swimming' || gamePhase === 'bite' || gamePhase === 'challenge') {
+          const bx = parseFloat(bobberEl.style.left) + 11;
+          const by = parseFloat(bobberEl.style.top) + 11;
+          if (!isNaN(bx) && !isNaN(by)) drawRod(bx, by);
+          lineRafId = requestAnimationFrame(loop);
+        } else {
+          lineRafId = null;
+        }
+      }
+      lineRafId = requestAnimationFrame(loop);
+    }
+
+    function stopLineRedraw() {
+      if (lineRafId) { cancelAnimationFrame(lineRafId); lineRafId = null; }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CAUGHT SPLASH UI
+    // ══════════════════════════════════════════════════════════════
+    function showCaughtSplash(fish, pts) {
+      const el = document.createElement('div');
+      el.className = 'caught-splash';
+
+      const rarityColors = {
+        common: '#4ecdc4', uncommon: '#6fde6f',
+        rare: '#6fa8ff', epic: '#d4a4ff', legendary: '#ffd93d'
+      };
+
+      el.innerHTML = `
+    <span class="caught-emoji">${fish.emoji}</span>
+    <div class="caught-name">${fish.name}!</div>
+    <div class="caught-rarity-text" style="color:${rarityColors[fish.rarity]}">
+      ${fish.rarity.toUpperCase()} · +${pts} pts
+    </div>
+  `;
+      document.body.appendChild(el);
+
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 500);
+      }, 1800);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  GOT AWAY UI
+    // ══════════════════════════════════════════════════════════════
+    function showGotAway() {
+      const el = document.createElement('div');
+      el.className = 'got-away';
+      el.innerHTML = `
+    <div class="got-away-emoji">🌊</div>
+    <div class="got-away-text">It got away!</div>
+  `;
+      document.body.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 500);
+      }, 1200);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CLICK RIPPLE (on water tap)
+    // ══════════════════════════════════════════════════════════════
+    function spawnClickRipple(x, y) {
+      const el = document.createElement('div');
+      el.className = 'click-ripple';
+      el.style.left = (x - 5) + 'px';
+      el.style.top = (y - 5) + 'px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 900);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  PARTICLES on successful catch
+    // ══════════════════════════════════════════════════════════════
+    function spawnParticles(cx, cy, baseColor) {
+      const colors = [baseColor, '#fff', '#ffd93d', '#40b4ff'];
+      for (let i = 0; i < 12; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const size = 5 + Math.random() * 6;
+        const angle = (i / 12) * Math.PI * 2 + Math.random() * 0.4;
+        const dist = 30 + Math.random() * 50;
+        p.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${colors[Math.floor(Math.random() * colors.length)]};
+      left:${cx + Math.cos(angle) * dist}px;
+      top:${cy + Math.sin(angle) * dist}px;
+    `;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 750);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  AUDIO: bite cue (Web Audio API — no external files needed)
+    // ══════════════════════════════════════════════════════════════
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+    function playBiteSound() {
+      try {
+        const ctx = getAudioCtx();
+        // Short "plop" sound: sine burst
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+      } catch (e) { }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  JOURNAL
+    // ══════════════════════════════════════════════════════════════
+    function openJournal() {
+      renderJournal();
+      document.getElementById('journalOverlay').classList.add('open');
+    }
+    function closeJournal() {
+      document.getElementById('journalOverlay').classList.remove('open');
+    }
+
+    function renderJournal() {
+      const container = document.getElementById('journalContent');
+      container.innerHTML = '';
+
+      for (const rarity of RARITY_ORDER) {
+        const fishInRarity = FISH_DB.filter(f => f.rarity === rarity);
+        const section = document.createElement('div');
+        section.className = 'journal-section';
+
+        const caughtInRarity = fishInRarity.filter(f => journal[f.id] > 0).length;
+        const title = document.createElement('div');
+        title.className = 'journal-section-title';
+        title.textContent = `${RARITY_LABELS[rarity]} (${caughtInRarity}/${fishInRarity.length})`;
+        section.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'fish-grid';
+
+        for (const fish of fishInRarity) {
+          const caught = journal[fish.id] > 0;
+          const card = document.createElement('div');
+          card.className = `fish-card ${caught ? 'caught' : 'missing'}`;
+          card.innerHTML = `
+        <div class="fish-card-emoji">${caught ? fish.emoji : '❓'}</div>
+        <div class="fish-card-name">${caught ? fish.name : '???'}</div>
+        <div class="fish-card-rarity" style="color:${fish.color}">${fish.rarity}</div>
+        ${caught ? `<div class="fish-card-count">×${journal[fish.id]}</div>` : ''}
+      `;
+          grid.appendChild(card);
+        }
+        section.appendChild(grid);
+        container.appendChild(section);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  SPEECH RECOGNITION
+    // ══════════════════════════════════════════════════════════════
+    function initSpeech() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        document.getElementById('micHint').textContent = '❌ Use Chrome or Edge';
+        return false;
+      }
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;   // select-then-speak: NOT continuous
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 5;
+
+      recognition.onstart = () => {
+        listening = true;
+        document.getElementById('micBtn').classList.add('listening');
+        document.getElementById('micHint').textContent = '🔴 Listening...';
+        document.getElementById('micHint').classList.add('active');
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        document.getElementById('micBtn').classList.remove('listening');
+        document.getElementById('micHint').textContent = 'Listen, then speak!';
+        document.getElementById('micHint').classList.remove('active');
+        document.getElementById('interimText').textContent = '';
+        if (gamePhase === 'challenge' && !challengeSolved) {
+          try { recognition.start(); } catch (e) {}
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error === 'no-speech' || e.error === 'aborted') return;
+        setFeedback('⚠️ Mic error: ' + e.error, 'wrong');
+      };
+
+      recognition.onresult = (e) => {
+        const idx = e.resultIndex;
+        const alts = Array.from(e.results[idx]).map(r => r.transcript.toLowerCase().trim());
+
+        if (!e.results[idx].isFinal) {
+          document.getElementById('interimText').textContent = '"' + alts[0] + '"';
+          return;
+        }
+        document.getElementById('interimText').textContent = '';
+        if (gamePhase !== 'challenge') return;
+
+        const ok = phraseMatches(alts, currentFish.phrase);
+        if (ok) {
+          challengeSolved = true;
+          if (window.VG && typeof VG.recordWordSaid === 'function' && typeof vgGetSelectedTopic === 'function') {
+            VG.recordWordSaid(vgGetSelectedTopic(), currentFish.phrase.text);
+          }
+          stopChallengeTimer();
+          setFeedback('✅ Perfect! Reeling in!', 'correct');
+          setTimeout(() => resolveChallenge(true), 550);
+        } else {
+          setFeedback(`❌ Heard: "${alts[0]}" — try again!`, 'wrong');
+        }
+      };
+
+      speechReady = true;
+      return true;
+    }
+
+    function toggleMic() {
+      if (gamePhase !== 'challenge') return;
+      if (!speechReady && !initSpeech()) return;
+      if (listening) {
+        stopListening();
+      } else {
+        try { recognition.start(); } catch (e) { }
+      }
+    }
+
+    function stopListening() {
+      if (listening && recognition) {
+        try { recognition.stop(); } catch (e) { }
+        listening = false;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  VOICE-OVER — speak the target sentence aloud
+    // ══════════════════════════════════════════════════════════════
+    function speakPhrase(text, onDone) {
+      if (!('speechSynthesis' in window)) { if (onDone) setTimeout(onDone, 0); return; }
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'en-US';
+      utt.onend = () => { if (onDone) setTimeout(onDone, 300); };
+      window.speechSynthesis.speak(utt);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  PHRASE MATCHING — fuzzy, A1-A2 friendly
+    // ══════════════════════════════════════════════════════════════
+    function phraseMatches(spokenAlts, phrase) {
+      for (const spoken of spokenAlts) {
+        // Check against all listed alternatives
+        for (const alt of phrase.alts) {
+          if (fuzzScore(spoken, alt) >= 0.68) return true;
+        }
+        // Content-word fallback
+        const targetWords = phrase.text
+          .replace(/\b(the|a|an|of|my|and|it|is|a)\b/g, '')
+          .trim().split(/\s+/).filter(w => w.length > 1);
+        const spokenWords = spoken.split(/\s+/);
+        let hits = 0;
+        for (const tw of targetWords) {
+          for (const sw of spokenWords) {
+            if (fuzzScore(sw, tw) >= 0.78) { hits++; break; }
+          }
+        }
+        if (hits >= Math.max(1, Math.ceil(targetWords.length * 0.55))) return true;
+      }
+      return false;
+    }
+
+    function fuzzScore(a, b) {
+      if (a === b) return 1;
+      if (a.includes(b) || b.includes(a)) return 0.92;
+      const d = levenshtein(a, b);
+      return Math.max(0, 1 - d / Math.max(a.length, b.length, 1));
+    }
+
+    function levenshtein(a, b) {
+      const m = a.length, n = b.length;
+      const dp = Array.from({ length: m + 1 }, (_, i) =>
+        Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+      );
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+          dp[i][j] = a[i - 1] === b[j - 1]
+            ? dp[i - 1][j - 1]
+            : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      return dp[m][n];
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  FEEDBACK
+    // ══════════════════════════════════════════════════════════════
+    function setFeedback(msg, type) {
+      const el = document.getElementById('feedback');
+      el.textContent = msg;
+      el.className = 'feedback-row ' + (type || '');
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  END GAME
+    // ══════════════════════════════════════════════════════════════
+    function endGame() {
+      // Clean up any in-progress state
+      clearTimeout(biteTimeout);
+      clearTimeout(swimStartTimeout);
+      clearTimeout(biteEscapeTimeout);
+      stopSwimFish();
+      stopChallengeTimer();
+      stopListening();
+      hideChallenge();
+      hideBobber();
+      gamePhase = 'idle';
+
+      bestScore = Math.max(bestScore, score);
+      if (window.VG) window.VG.saveScore('voice-angler', score);
+
+      const screen = document.getElementById('endScreen');
+      document.getElementById('endScoreVal').textContent = score + ' pts';
+      document.getElementById('endCaughtVal').textContent = totalCaught + ' fish';
+      screen.className = 'end-screen show';
+    }
+
+    function restartGame() {
+      document.getElementById('endScreen').className = 'end-screen';
+      score = 0; totalCaught = 0;
+      // Reset journal for new session (keep best score across sessions)
+      FISH_DB.forEach(f => journal[f.id] = 0);
+      updateHUD();
+      castHintEl.style.opacity = '1';
+      gamePhase = 'idle';
+      startGameClock();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      // Cache DOM
+      bobberEl = document.getElementById('bobber');
+      ripple1El = document.getElementById('ripple1');
+      ripple2El = document.getElementById('ripple2');
+      rodSvgEl = document.getElementById('rodSvg');
+      rodContainerEl = document.getElementById('rodContainer');
+      sceneEl = document.getElementById('scene');
+      waterEl = document.getElementById('water');
+      challengePanelEl = document.getElementById('challengePanel');
+      castHintEl = document.getElementById('castHint');
+      biteAlertEl = document.getElementById('biteAlert');
+
+      // Build decorative scene elements
+      buildStars();
+      buildWaves();
+
+      // Wire up events
+      sceneEl.addEventListener('click', onWaterClick);
+      bobberEl.addEventListener('click', onBobberClick);
+
+      // Close journal on overlay background click
+      document.getElementById('journalOverlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('journalOverlay')) closeJournal();
+      });
+
+      // Start the game clock
+      startGameClock();
+    });
+  </script>
+</body>
+
+</html>

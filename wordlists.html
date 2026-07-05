@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Lists — VoiceGames</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="games/shared/wordlists.js"></script>
+<script src="games/shared/utils.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #0f0e17;
+  color: #fff;
+  min-height: 100vh;
+  padding: 2rem;
+}
+.back-btn {
+  position: fixed; top: 16px; left: 16px; z-index: 50;
+  display: flex; align-items: center; gap: 8px;
+  background: #1a1a2e; border: 1px solid #333; color: #ccc;
+  padding: 8px 16px; border-radius: 50px; font-size: 0.85em;
+  font-weight: 700; text-decoration: none; transition: all 0.2s;
+}
+.back-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+.container { max-width: 900px; margin: 0 auto; padding-top: 3rem; }
+h1 { font-size: 2rem; font-weight: 900; text-align: center; margin-bottom: 0.3rem; }
+h1 em { font-style: normal; color: #ff6b6b; }
+.sub { text-align: center; color: rgba(255,255,255,0.4); margin-bottom: 2.5rem; }
+
+.topic-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px; margin-bottom: 2.5rem;
+}
+.topic-card {
+  background: rgba(255,255,255,0.04);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 18px; padding: 1.5rem 1rem;
+  text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.topic-card:hover { border-color: rgba(255,107,107,0.4); transform: translateY(-2px); }
+.topic-card.active { border-color: #ff6b6b; background: rgba(255,107,107,0.1); }
+.topic-emoji { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.topic-name { font-weight: 900; font-size: 1.05rem; }
+.topic-active-badge {
+  display: none; margin-top: 6px; font-size: 0.7rem; font-weight: 900;
+  color: #ff6b6b; text-transform: uppercase; letter-spacing: 1px;
+}
+.topic-card.active .topic-active-badge { display: block; }
+
+.preview-section { margin-bottom: 2rem; }
+.preview-title {
+  font-size: 0.85rem; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 1px; color: rgba(255,255,255,0.4); margin-bottom: 0.8rem;
+}
+.preview-tabs { display: flex; gap: 8px; margin-bottom: 1rem; }
+.preview-tab {
+  padding: 6px 16px; border-radius: 50px; font-size: 0.8rem; font-weight: 700;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer; color: rgba(255,255,255,0.6); transition: all 0.2s;
+}
+.preview-tab.active { background: rgba(255,107,107,0.15); border-color: #ff6b6b; color: #ff6b6b; }
+
+.word-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+.word-chip {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 8px 12px; font-size: 0.85rem;
+}
+.word-chip .en { font-weight: 700; }
+.word-chip .ru { color: rgba(255,255,255,0.4); font-size: 0.78rem; margin-top: 2px; }
+
+.sentence-list { display: flex; flex-direction: column; gap: 8px; }
+.sentence-chip {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 10px 14px; font-size: 0.88rem;
+}
+.sentence-chip .en { font-weight: 700; }
+.sentence-chip .ru { color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 2px; }
+.word-chip .count, .sentence-chip .count {
+  display: inline-block; margin-top: 4px; font-size: 0.7rem; font-weight: 900;
+  color: #ff6b6b; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.game-note {
+  text-align: center; color: rgba(255,255,255,0.3); font-size: 0.8rem;
+  margin-top: 2rem; line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<a href="play.html" class="back-btn">← Menu</a>
+
+<div class="container">
+  <h1>📚 Word <em>Lists</em></h1>
+  <div class="sub">Pick a topic — it applies to Heroes, Voice Angler, and Spell Match-3</div>
+
+  <div class="topic-grid" id="topicGrid"></div>
+
+  <div class="preview-section">
+    <div class="preview-title">Preview</div>
+    <div class="preview-tabs">
+      <div class="preview-tab active" data-mode="words" onclick="switchPreview('words')">🗡️ Words (Heroes)</div>
+      <div class="preview-tab" data-mode="sentences" onclick="switchPreview('sentences')">💬 Sentences (Angler / Match-3)</div>
+    </div>
+    <div id="previewContent"></div>
+  </div>
+
+  <div class="game-note">
+    Changing the topic here updates the vocabulary used across Heroes of Voice and Magic,<br>
+    Voice Angler, and Spell Match-3 the next time you open those games.
+  </div>
+</div>
+
+<script>
+let currentPreviewMode = 'words';
+
+function renderTopicGrid() {
+  const grid = document.getElementById('topicGrid');
+  const selected = vgGetSelectedTopic();
+  grid.innerHTML = '';
+  VG_TOPIC_LIST.forEach(topic => {
+    const card = document.createElement('div');
+    card.className = 'topic-card' + (topic.id === selected ? ' active' : '');
+    card.innerHTML = `
+      <div class="topic-emoji">${topic.emoji}</div>
+      <div class="topic-name">${topic.name}</div>
+      <div class="topic-active-badge">✓ Selected</div>
+    `;
+    card.onclick = () => {
+      vgSetSelectedTopic(topic.id);
+      renderTopicGrid();
+      renderPreview();
+    };
+    grid.appendChild(card);
+  });
+}
+
+function switchPreview(mode) {
+  currentPreviewMode = mode;
+  document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.preview-tab[data-mode="${mode}"]`).classList.add('active');
+  renderPreview();
+}
+
+function renderPreview() {
+  const selected = vgGetSelectedTopic();
+  const topic = vgGetTopic(selected);
+  const container = document.getElementById('previewContent');
+  const counts = (window.VG && typeof VG.getWordCounts === 'function') ? VG.getWordCounts(selected) : {};
+
+  if (currentPreviewMode === 'words') {
+    const allWords = [...topic.words.attack, ...topic.words.defend, ...topic.words.heal];
+    container.innerHTML = `<div class="word-grid">${allWords.map(w => `
+      <div class="word-chip">
+        <div class="en">${w.word}</div>
+        <div class="ru">${w.ru}</div>
+        <div class="count">Said ${counts[w.word] || 0}×</div>
+      </div>
+    `).join('')}</div>`;
+  } else {
+    container.innerHTML = `<div class="sentence-list">${topic.sentences.map(s => `
+      <div class="sentence-chip">
+        <div class="en">${s.text}</div>
+        <div class="ru">${s.ru}</div>
+        <div class="count">Said ${counts[s.text] || 0}×</div>
+      </div>
+    `).join('')}</div>`;
+  }
+}
+
+renderTopicGrid();
+renderPreview();
+</script>
+
+</body>
+</html>

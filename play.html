@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoiceGames — Play</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #0f0e17;
+      color: #fff;
+      min-height: 100vh;
+      display: flex
+    }
+
+    .sidebar {
+      width: 200px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.03);
+      border-right: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      padding: 2rem 1rem;
+      position: fixed
+    }
+
+    .logo {
+      font-size: 1.2rem;
+      font-weight: 900;
+      margin-bottom: 3rem;
+      padding-left: 0.5rem
+    }
+
+    .logo span {
+      color: #ff6b6b
+    }
+
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem
+    }
+
+    .menu a {
+      display: block;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
+      text-decoration: none;
+      color: rgba(255, 255, 255, 0.45);
+      font-weight: 700;
+      font-size: 0.95rem;
+      transition: all 0.2s
+    }
+
+    .menu a:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: #fff
+    }
+
+    .menu a.active {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b
+    }
+
+    .main {
+      margin-left: 200px;
+      flex: 1;
+      padding: 3rem;
+      overflow-y: auto
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 900;
+      margin-bottom: 0.4rem
+    }
+
+    .sub {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.9rem;
+      margin-bottom: 2rem
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem
+    }
+
+    .card {
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5)
+    }
+
+    .card:hover .overlay {
+      opacity: 1
+    }
+
+    .top {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.2rem;
+      position: relative
+    }
+
+    .badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 0.65rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 50px
+    }
+
+    .hot {
+      background: rgba(255, 180, 0, 0.2);
+      color: #ffd93d;
+      border: 1px solid rgba(255, 180, 0, 0.3)
+    }
+
+    .new {
+      background: rgba(255, 107, 107, 0.2);
+      color: #ff9999;
+      border: 1px solid rgba(255, 107, 107, 0.3)
+    }
+
+    .starter {
+      background: rgba(78, 205, 196, 0.2);
+      color: #4ecdc4;
+      border: 1px solid rgba(78, 205, 196, 0.3)
+    }
+
+    .body {
+      padding: 1rem 1.2rem 1.2rem;
+      background: rgba(255, 255, 255, 0.04)
+    }
+
+    .body h3 {
+      font-size: 0.95rem;
+      font-weight: 900;
+      margin-bottom: 0.3rem
+    }
+
+    .body p {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.4);
+      line-height: 1.5;
+      margin-bottom: 0.8rem
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center
+    }
+
+    .stars {
+      font-size: 0.8rem;
+      color: #ffd93d;
+      font-weight: 700
+    }
+
+    .diff {
+      font-size: 0.7rem;
+      font-weight: 900;
+      padding: 0.2rem 0.55rem;
+      border-radius: 50px
+    }
+
+    .easy {
+      background: rgba(78, 205, 196, 0.15);
+      color: #4ecdc4
+    }
+
+    .medium {
+      background: rgba(255, 180, 0, 0.15);
+      color: #ffd93d
+    }
+
+    .hard {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s
+    }
+
+    .play-btn {
+      background: #ff6b6b;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 0.85rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: 50px;
+      border: none;
+      cursor: pointer
+    }
+
+    .g1 {
+      background: linear-gradient(135deg, #1a0f3d, #3b1f7a)
+    }
+
+    .g2 {
+      background: linear-gradient(135deg, #0d2137, #0f4c81)
+    }
+
+    .g3 {
+      background: linear-gradient(135deg, #1a2e0d, #2d6b1a)
+    }
+
+    .g4 {
+      background: linear-gradient(135deg, #2e0d1a, #7a1b45)
+    }
+
+    .g5 {
+      background: linear-gradient(135deg, #2e1a0d, #8a3e0a)
+    }
+
+    .g6 {
+      background: linear-gradient(135deg, #0d2e2e, #0a6060)
+    }
+
+    .g7 {
+      background: linear-gradient(135deg, #1a0d2e, #501b7a)
+    }
+
+    .g8 {
+      background: linear-gradient(135deg, #2e2a0d, #6b5a0a)
+    }
+
+    .g9 {
+      background: linear-gradient(135deg, #0d1a2e, #1b406b)
+    }
+
+    .g10 {
+      background: linear-gradient(135deg, #2e0d0d, #8a1b1b)
+    }
+
+    .g11 {
+      background: linear-gradient(135deg, #180a30, #5a1a9a)
+    }
+
+    .g12 {
+      background: linear-gradient(135deg, #061628, #0a4070)
+    }
+  </style>
+</head>
+
+<body>
+
+  <aside class="sidebar">
+    <div class="logo">🎤 Voice<span>Games</span></div>
+    <nav class="menu">
+      <a href="play.html" class="active">🎮 Play</a>
+      <a href="wordlists.html">📚 Word Lists</a>
+      <a href="#">⚙️ Options</a>
+      <a href="#">🏆 Leaderboard</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <h1>Choose a game 🎮</h1>
+    <div class="sub">Pick one and start playing!</div>
+    <div class="grid">
+
+      <div class="card">
+        <div class="top g9">🖼️<div class="badge new">New</div>
+        </div>
+        <div class="body">
+          <h3>Picture Sentence</h3>
+          <p>Look at the picture, read the hint, and say the sentence out loud!</p>
+          <div class="meta">
+            <div class="stars">⭐ 4.8</div><span class="diff easy">Easy</span>
+          </div>
+        </div>
+        <div class="overlay"><a href="games/picture-sentence/index.html"><button class="play-btn">▶ Play</button></a></div>
+      </div>
+      <div class="card">
+        <div class="top g7">🎨<div class="badge new">New</div>
+        </div>
+        <div class="body">
+          <h3>Color Match</h3>
+          <p>Say the color you see and paint the world with your voice!</p>
+          <div class="meta">
+            <div class="stars">⭐ 4.7</div><span class="diff easy">Easy</span>
+          </div>
+        </div>
+        <div class="overlay"><a href="games/color-match/index.html"><button class="play-btn">▶ Play</button></a></div>
+      </div>
+
+      <div class="card">
+        <div class="top g9">🧙<div class="badge new">New</div>
+        </div>
+        <div class="body">
+          <h3>Heroes of Voice and Magic</h3>
+          <p>Cast spells by speaking magical words into your microphone!</p>
+          <div class="meta">
+            <div class="stars">⭐ 5.0</div><span class="diff medium">Medium</span>
+          </div>
+        </div>
+        <div class="overlay"><a href="games/voice-magic/index.html"><button class="play-btn">▶ Play</button></a></div>
+      </div>
+
+      <div class="card" onclick="location.href='games/spell-match3/index.html'">
+        <div class="top g11">⚗️<div class="badge new">New</div>
+        </div>
+        <div class="body">
+          <h3>Spell Match-3</h3>
+          <p>Swap crystals, say the spell, match three in a row!</p>
+          <div class="meta">
+            <div class="stars">⭐ 4.9</div><span class="diff medium">Medium</span>
+          </div>
+        </div>
+        <div class="overlay"><a href="games/spell-match3/index.html"><button class="play-btn">▶ Play</button></a></div>
+      </div>
+
+      <div class="card" onclick="location.href='games/voice-angler/index.html'">
+        <div class="top g12">🎣<div class="badge new">New</div>
+        </div>
+        <div class="body">
+          <h3>Voice Angler</h3>
+          <p>Cast your line, wait for a bite, say the phrase to reel in the fish!</p>
+          <div class="meta">
+            <div class="stars">⭐ 4.8</div><span class="diff medium">Medium</span>
+          </div>
+        </div>
+        <div class="overlay"><a href="games/voice-angler/index.html"><button class="play-btn">▶ Play</button></a></div>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+
+</html>

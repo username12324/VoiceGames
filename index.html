@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceGames</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Nunito',sans-serif;background:#0f0e17;color:#fff;min-height:100vh;display:flex}
+
+.sidebar{width:200px;height:100vh;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;padding:2rem 1rem;position:fixed}
+.logo{font-size:1.2rem;font-weight:900;margin-bottom:3rem;padding-left:0.5rem}
+.logo span{color:#ff6b6b}
+.menu{display:flex;flex-direction:column;gap:0.3rem}
+.menu a{display:block;padding:0.8rem 1rem;border-radius:12px;text-decoration:none;color:rgba(255,255,255,0.45);font-weight:700;font-size:0.95rem;transition:all 0.2s}
+.menu a:hover{background:rgba(255,255,255,0.07);color:#fff}
+.menu a.active{background:rgba(255,107,107,0.15);color:#ff6b6b}
+
+.main{margin-left:200px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem}
+.mascot{font-size:5rem;margin-bottom:1.5rem;display:block;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+h1{font-size:3rem;font-weight:900;margin-bottom:1rem}
+h1 em{font-style:normal;color:#ff6b6b}
+p{color:rgba(255,255,255,0.45);font-size:1rem;max-width:360px;line-height:1.7;margin-bottom:2.5rem}
+.btn{background:#ff6b6b;color:#fff;font-family:'Nunito',sans-serif;font-size:1.1rem;font-weight:900;padding:1rem 2.5rem;border-radius:50px;border:none;cursor:pointer;text-decoration:none;display:inline-block;transition:all 0.2s;box-shadow:0 0 40px rgba(255,107,107,0.3)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 0 60px rgba(255,107,107,0.45)}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">🎤 Voice<span>Games</span></div>
+  <nav class="menu">
+    <a href="play.html" class="active">🎮 Play</a>
+    <a href="#">⚙️ Options</a>
+    <a href="#">🏆 Leaderboard</a>
+  </nav>
+</aside>
+
+<main class="main">
+  <span class="mascot">🦜</span>
+  <h1>Learn to speak<br>through <em>play</em></h1>
+  <p>Fun voice games that help kids practice speaking and build confidence.</p>
+  <a href="play.html" class="btn">🎮 Play</a>
+</main>
+
+</body>
+</html>

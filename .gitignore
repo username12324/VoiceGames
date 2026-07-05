@@ -1,0 +1,35 @@
+# ── OS ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor / IDE ──────────────────────────────────────────────────────
+.vscode/
+*.code-workspace
+.idea/
+
+# ── Node ──────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Test artefacts (Playwright & Jest) ────────────────────────────────
+test-results/
+playwright-report/
+junit*.xml
+coverage/
+
+# ── Accidental root-level files ───────────────────────────────────────
+# Backup / scratch package files
+package_BACKUP_*.json
+# Screenshots / recordings dropped in the project root
+/*.jpg
+
+# Local build / test directories
+public/
+/*.jpeg
+/*.png
+/*.mp4
+/*.webm
+# Loose markdown reports not in docs/ or reports/
+testing-report.md

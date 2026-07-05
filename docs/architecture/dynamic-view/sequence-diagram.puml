@@ -1,0 +1,16 @@
+@startuml
+actor "Child (User)" as User
+participant "UI Button" as UI
+participant "Game Engine" as Game
+participant "Speech Manager" as Speech
+participant "Web Speech API" as API
+
+User -> UI: Click "Fireball" spell
+UI -> Game: Trigger spell selection
+Game -> Speech: Start listening (target: "Fireball")
+Speech -> API: Request microphone & stream
+API --> Speech: Return transcript "Fireball"
+Speech -> Game: Validate: "Fireball" == "Fireball"
+Game -> UI: Play animation & damage enemy
+Game -> Game: Save progress to LocalStorage
+@enduml

@@ -1,0 +1,115 @@
+stages:
+  - test
+  - unit-test
+  - qr-test
+  - deploy
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[skip-ci\]/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: always
+    - if: $CI_COMMIT_BRANCH   # <-- runs on any branch push
+      when: always
+    - when: never
+
+variables:
+  PLAYWRIGHT_BROWSERS_PATH: /playwright
+  CI: "true"
+
+# ------------------------------------------------------------------
+# EXISTING JOBS
+# ------------------------------------------------------------------
+
+lychee_check:
+  stage: test
+  image:
+    name: lycheeverse/lychee:latest
+    entrypoint: [""]
+  script:
+    - lychee --config lychee.toml "**/*.md"
+  allow_failure: true
+
+http-status-check:
+  stage: qr-test
+  image: curlimages/curl:latest
+  script:
+    - echo "Checking if main page loads..."
+    - curl --fail --silent --head https://$CI_PAGES_URL || echo "Pages URL not available yet"
+  allow_failure: true
+  only:
+    - main
+
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp index.html play.html wordlists.html public/
+    - cp -r games public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+  when: always
+
+unit-tests:
+  stage: unit-test
+  image: node:18-slim
+  before_script:
+    - npm ci --omit=optional
+  script:
+    - npm run test:unit
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    reports:
+      junit: junit.xml
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  rules:
+    - if: $CI_COMMIT_BRANCH   # <-- runs on any branch
+      when: always
+    - if: $CI_COMMIT_MESSAGE =~ /\[skip-ci\]/
+      when: never
+
+qrt-execution:
+  allow_failure: true
+  stage: qr-test
+  image: node:18-slim
+  before_script:
+    - apt-get update && apt-get install -y python3 curl
+    - npm ci
+    - npx playwright install --with-deps chromium
+    - mkdir -p public
+    - cp index.html play.html wordlists.html public/
+    - cp -r games public/
+  script:
+    # Start a static file server to serve the game files
+    - cd public
+    - python3 -m http.server 3000 &
+    - SERVER_PID=$!
+    - cd ..
+    - npx wait-on --timeout 10000 http://localhost:3000
+    # Run the actual QRT tests (Playwright) against the local server
+    # --workers=1 prevents the python http.server from dying under concurrent load
+    # Reporters are configured in playwright.config.ts (junit -> junit-qrt.xml, html -> playwright-report/)
+    - npx playwright test tests/qrt/ --workers=1
+    - kill $SERVER_PID || true
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+      - test-results/
+    reports:
+      junit: junit-qrt.xml
+  timeout: 10m
+  retry: 1
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: always
+    - if: $CI_COMMIT_MESSAGE =~ /\[skip-ci\]/
+      when: never

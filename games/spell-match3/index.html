@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spell Match-3 — VoiceGames</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#080614;
+  font-family:'Nunito',sans-serif;
+  display:flex;flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+  color:#fff;
+  padding:8px 8px 16px;
+  background-image:
+    radial-gradient(ellipse at 15% 20%,rgba(130,50,220,0.18) 0%,transparent 55%),
+    radial-gradient(ellipse at 85% 80%,rgba(40,90,210,0.18) 0%,transparent 55%);
+}
+
+/* ── MENU BUTTON ── */
+.menu-btn{
+  position:fixed;top:12px;left:12px;z-index:400;
+  display:flex;align-items:center;gap:7px;
+  background:rgba(20,14,40,0.95);border:1px solid rgba(155,89,182,0.35);color:#c8aee0;
+  padding:7px 15px;border-radius:50px;font-size:0.8em;font-weight:700;
+  text-decoration:none;cursor:pointer;transition:all .2s;
+  backdrop-filter:blur(12px);
+}
+.menu-btn:hover{border-color:#9b59b6;color:#d9a8ff;box-shadow:0 0 14px rgba(155,89,182,0.25);}
+
+/* ── WRAPPER ── */
+.game-wrapper{
+  width:100%;max-width:540px;
+  margin-top:4px;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 0 80px rgba(155,89,182,0.22),0 0 0 1px rgba(155,89,182,0.18);
+}
+
+/* ── HEADER ── */
+.header{
+  text-align:center;padding:14px 20px 10px;
+  background:linear-gradient(180deg,#1a0a30 0%,#130c24 100%);
+  border-bottom:1px solid rgba(155,89,182,0.2);
+}
+.header-title{
+  font-family:'Press Start 2P',monospace;font-size:0.82em;
+  color:#d4a4ff;
+  text-shadow:0 0 24px rgba(180,80,255,0.65),2px 2px 0 #3a0070;
+  letter-spacing:1px;
+}
+.header-sub{font-size:0.72em;color:rgba(255,255,255,0.35);margin-top:5px;}
+
+/* ── STATS BAR ── */
+.stats-bar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 18px;
+  background:#150f28;
+  border-bottom:1px solid rgba(155,89,182,0.15);
+}
+.stat-group{display:flex;align-items:center;gap:14px;}
+.stat-item{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.stat-label{font-size:0.55em;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.8px;}
+.stat-value{font-family:'Press Start 2P',monospace;font-size:0.65em;color:#d4a4ff;}
+.combo-badge{
+  font-size:0.62em;font-weight:900;
+  background:linear-gradient(135deg,#e056fd,#ff6b6b);
+  color:#fff;padding:3px 10px;border-radius:50px;
+  display:none;animation:comboPop .4s ease;
+}
+@keyframes comboPop{0%{transform:scale(.4) rotate(-8deg)}60%{transform:scale(1.2) rotate(3deg)}100%{transform:scale(1) rotate(0)}}
+
+/* ── BOARD CONTAINER ── */
+.board-container{
+  background:linear-gradient(180deg,#110a22 0%,#0c1420 100%);
+  padding:12px;position:relative;overflow:hidden;
+}
+.stars-bg{
+  position:absolute;inset:0;pointer-events:none;z-index:1;
+  background-image:
+    radial-gradient(1px 1px at 8% 12%,rgba(255,255,255,.45),transparent),
+    radial-gradient(1px 1px at 25% 5%,rgba(255,255,255,.3),transparent),
+    radial-gradient(1px 1px at 52% 20%,rgba(255,255,255,.4),transparent),
+    radial-gradient(1px 1px at 72% 8%,rgba(255,255,255,.35),transparent),
+    radial-gradient(1px 1px at 88% 28%,rgba(255,255,255,.4),transparent),
+    radial-gradient(1px 1px at 18% 55%,rgba(255,255,255,.2),transparent),
+    radial-gradient(1px 1px at 63% 48%,rgba(255,255,255,.2),transparent),
+    radial-gradient(1px 1px at 40% 75%,rgba(255,255,255,.15),transparent),
+    radial-gradient(1px 1px at 90% 65%,rgba(255,255,255,.15),transparent);
+}
+
+/* ── BOARD GRID ── */
+.board{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  gap:5px;position:relative;z-index:2;
+}
+
+/* ── CELL ── */
+.cell{
+  aspect-ratio:1;border-radius:8px;cursor:pointer;
+  position:relative;
+  user-select:none;
+  transition:transform .1s ease;
+}
+.cell:hover:not(.empty){transform:scale(1.07);z-index:10;}
+
+/* ── GEM ── */
+.gem{
+  width:100%;height:100%;
+  border-radius:8px;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4em;
+  image-rendering:pixelated;
+  transition:transform .12s ease, filter .12s ease;
+}
+
+/* Pixel highlight */
+.gem::before{
+  content:'';position:absolute;
+  top:4px;left:6px;width:7px;height:4px;
+  background:rgba(255,255,255,.55);border-radius:50%;
+  pointer-events:none;z-index:3;
+}
+/* Pixel shadow */
+.gem::after{
+  content:'';position:absolute;
+  bottom:4px;right:5px;width:5px;height:3px;
+  background:rgba(0,0,0,.35);border-radius:50%;
+  pointer-events:none;z-index:3;
+}
+
+/* GEM TYPES */
+.gem-0{/* Ruby */
+  background:linear-gradient(145deg,#ff8fa0 0%,#e02030 45%,#7a1020 100%);
+  box-shadow:inset 3px 3px 0 rgba(255,200,210,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(220,0,30,.35);
+}
+.gem-1{/* Amethyst */
+  background:linear-gradient(145deg,#c9a8f5 0%,#8e44ad 45%,#4a205a 100%);
+  box-shadow:inset 3px 3px 0 rgba(230,200,255,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(142,68,173,.35);
+}
+.gem-2{/* Sapphire */
+  background:linear-gradient(145deg,#7ec8ff 0%,#2980b9 45%,#183f6a 100%);
+  box-shadow:inset 3px 3px 0 rgba(170,225,255,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(41,128,185,.35);
+}
+.gem-3{/* Emerald */
+  background:linear-gradient(145deg,#60f0b0 0%,#27ae60 45%,#124e2c 100%);
+  box-shadow:inset 3px 3px 0 rgba(170,255,210,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(39,174,96,.35);
+}
+.gem-4{/* Topaz */
+  background:linear-gradient(145deg,#ffe88a 0%,#f0a000 45%,#7a4c00 100%);
+  box-shadow:inset 3px 3px 0 rgba(255,245,180,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(240,160,0,.35);
+}
+.gem-5{/* Opal */
+  background:linear-gradient(145deg,#90f0e0 0%,#00b894 45%,#005f4e 100%);
+  box-shadow:inset 3px 3px 0 rgba(190,255,245,.55),inset -2px -2px 0 rgba(0,0,0,.45),0 3px 10px rgba(0,184,148,.35);
+}
+
+/* ── SELECTED STATES ── */
+.cell.sel1 .gem{
+  animation:sel1Pulse .7s ease-in-out infinite;
+  transform:scale(1.13);
+  outline:3px solid #f1c40f;outline-offset:2px;
+}
+@keyframes sel1Pulse{
+  0%,100%{filter:brightness(1.1) drop-shadow(0 0 7px rgba(241,196,15,.9));}
+  50%{filter:brightness(1.35) drop-shadow(0 0 16px rgba(241,196,15,1));}
+}
+
+.cell.sel2 .gem{
+  animation:sel2Pulse .7s ease-in-out infinite;
+  transform:scale(1.13);
+  outline:3px solid #e056fd;outline-offset:2px;
+}
+@keyframes sel2Pulse{
+  0%,100%{filter:brightness(1.1) drop-shadow(0 0 7px rgba(224,86,253,.9));}
+  50%{filter:brightness(1.35) drop-shadow(0 0 16px rgba(224,86,253,1));}
+}
+
+/* ── CLEARING ── */
+@keyframes clearGem{
+  0%{transform:scale(1);filter:brightness(1);}
+  30%{transform:scale(1.35);filter:brightness(4) saturate(3);}
+  100%{transform:scale(0);filter:brightness(0);opacity:0;}
+}
+.cell.clearing .gem{animation:clearGem .45s ease forwards;}
+
+/* ── DROP IN ── */
+@keyframes dropIn{
+  0%{transform:translateY(-40px) scale(.7);opacity:0;}
+  70%{transform:translateY(4px) scale(1.05);opacity:1;}
+  100%{transform:translateY(0) scale(1);opacity:1;}
+}
+.gem.dropping{animation:dropIn .28s ease forwards;}
+
+/* ── BOARD OVERLAY (blocks clicks during phrase) ── */
+.board-overlay{
+  position:absolute;inset:0;z-index:50;
+  pointer-events:none;background:transparent;
+  transition:background .3s;border-radius:0;
+}
+.board-overlay.blocking{pointer-events:all;background:rgba(0,0,0,.28);}
+
+/* ── PHRASE PANEL ── */
+.phrase-panel{
+  background:linear-gradient(180deg,#1a0930 0%,#120c22 100%);
+  border-top:2px solid #9b59b6;
+  padding:14px 20px 10px;
+  position:relative;overflow:hidden;
+  display:none;
+}
+.phrase-panel.active{display:block;animation:slideUp .3s ease;}
+@keyframes slideUp{0%{transform:translateY(20px);opacity:0;}100%{transform:translateY(0);opacity:1;}}
+
+/* Glow top border */
+.phrase-panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,#e056fd,#9b59b6,transparent);
+  animation:borderShimmer 2s linear infinite;
+}
+@keyframes borderShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+.phrase-label{
+  font-size:.62em;color:rgba(255,255,255,.38);
+  text-transform:uppercase;letter-spacing:2px;
+  margin-bottom:8px;display:flex;align-items:center;gap:6px;
+}
+.phrase-text{
+  font-family:'Press Start 2P',monospace;
+  font-size:.8em;color:#f0e6ff;
+  text-align:center;padding:13px 10px;
+  background:rgba(155,89,182,.1);
+  border-radius:10px;border:1px solid rgba(155,89,182,.3);
+  line-height:1.7;margin-bottom:10px;
+  text-shadow:0 0 14px rgba(200,150,255,.5);
+  letter-spacing:1px;
+  animation:phraseGlow 2.5s ease-in-out infinite;
+}
+@keyframes phraseGlow{
+  0%,100%{box-shadow:0 0 8px rgba(155,89,182,.2);}
+  50%{box-shadow:0 0 22px rgba(155,89,182,.45);}
+}
+
+/* Timer row */
+.timer-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.timer-track{flex:1;height:6px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;}
+.timer-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#6c3483,#e056fd);transition:width .1s linear,background .4s ease;}
+.timer-fill.urgent{background:linear-gradient(90deg,#c0392b,#ff6b6b);}
+.timer-num{font-family:'Press Start 2P',monospace;font-size:.65em;color:#e056fd;min-width:18px;text-align:right;}
+.timer-num.urgent{color:#ff6b6b;}
+
+/* Mic row */
+.mic-row{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:6px;}
+.mic-btn{
+  width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg,#9b59b6,#6c3483);
+  border:none;font-size:1.5em;cursor:pointer;
+  box-shadow:0 4px 18px rgba(155,89,182,.5);
+  transition:all .15s ease;
+  display:flex;align-items:center;justify-content:center;
+}
+.mic-btn:hover{transform:scale(1.08);}
+.mic-btn.listening{animation:micRing 1s ease-in-out infinite;background:linear-gradient(135deg,#e056fd,#9b59b6);}
+@keyframes micRing{
+  0%{box-shadow:0 0 0 0 rgba(224,86,253,.8);}
+  70%{box-shadow:0 0 0 18px rgba(224,86,253,0);}
+  100%{box-shadow:0 0 0 0 rgba(224,86,253,0);}
+}
+.mic-hint{font-size:.72em;color:rgba(255,255,255,.4);font-weight:700;}
+.mic-hint.active{color:#e056fd;}
+
+.interim-text{
+  font-size:.7em;color:rgba(255,255,255,.4);
+  text-align:center;font-style:italic;min-height:16px;margin-top:4px;
+}
+.feedback-row{
+  text-align:center;font-size:.78em;font-weight:700;
+  min-height:18px;padding:4px 0;transition:color .2s;
+}
+.feedback-row.correct{color:#2ecc71;}
+.feedback-row.wrong{color:#e74c3c;}
+.feedback-row.info{color:#f1c40f;}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 18px;
+  background:#0e0920;
+  border-top:1px solid rgba(155,89,182,.15);
+}
+.bar-stat{font-size:.68em;color:rgba(255,255,255,.32);}
+.bar-stat span{color:#d4a4ff;font-weight:700;}
+
+/* ── SPARKLE ── */
+@keyframes sparkleOut{
+  0%{opacity:1;transform:scale(0) rotate(0deg);}
+  60%{opacity:1;transform:scale(1.3) rotate(200deg);}
+  100%{opacity:0;transform:scale(0) rotate(360deg);}
+}
+.sparkle{
+  position:fixed;width:8px;height:8px;
+  border-radius:50%;pointer-events:none;z-index:999;
+  animation:sparkleOut .55s ease forwards;
+}
+
+/* ── END SCREEN ── */
+.end-screen{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(4,2,14,.9);z-index:600;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  backdrop-filter:blur(8px);
+}
+.end-screen.show{display:flex;}
+.end-title{
+  font-family:'Press Start 2P',monospace;
+  font-size:1.25em;color:#d4a4ff;text-align:center;
+  text-shadow:0 0 35px rgba(200,100,255,.8),0 0 70px rgba(200,100,255,.4);
+  line-height:1.5;
+}
+.end-stars{font-size:2em;letter-spacing:6px;margin:-4px 0 4px;}
+.end-score-wrap{
+  background:rgba(155,89,182,.12);border:1px solid rgba(155,89,182,.3);
+  border-radius:14px;padding:14px 28px;text-align:center;
+}
+.end-score-label{font-size:.6em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:2px;}
+.end-score-val{font-family:'Press Start 2P',monospace;font-size:.9em;color:#f0e6ff;margin-top:4px;}
+.end-btns{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.end-btn{
+  background:linear-gradient(135deg,#9b59b6,#6c3483);
+  border:none;color:#fff;font-family:'Nunito',sans-serif;
+  font-weight:900;font-size:1em;
+  padding:12px 32px;border-radius:50px;cursor:pointer;
+  box-shadow:0 6px 20px rgba(155,89,182,.45);
+  transition:all .2s;
+}
+.end-btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(155,89,182,.6);}
+.end-link{color:rgba(255,255,255,.3);font-size:.82em;text-decoration:none;}
+.end-link:hover{color:rgba(255,255,255,.6);}
+
+/* ── GEM LEGEND ── */
+.gem-legend{
+  display:flex;justify-content:center;gap:8px;
+  padding:6px 18px;
+  background:#0e0920;
+}
+.legend-gem{
+  width:16px;height:16px;border-radius:3px;
+  image-rendering:pixelated;
+}
+</style>
+  <script src="../shared/utils.js"></script>
+  <script src="../shared/wordlists.js"></script>
+</head>
+<body>
+
+<a href="../../play.html" class="menu-btn" id="menuBtn">← Menu</a>
+
+<div class="game-wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">⚗️ SPELL MATCH-3 ⚗️</div>
+    <div class="header-sub">Click two crystals · Say the spell · Match three!</div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-group">
+      <div class="stat-item">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="scoreVal">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Target</span>
+        <span class="stat-value" id="targetVal">500</span>
+      </div>
+    </div>
+    <div class="combo-badge" id="comboBadge">⚡ x2 COMBO!</div>
+    <div class="stat-group">
+      <div class="stat-item">
+        <span class="stat-label">Level</span>
+        <span class="stat-value" id="levelVal">1</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Moves</span>
+        <span class="stat-value" id="movesVal">20</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="board-container">
+    <div class="stars-bg"></div>
+    <div class="board" id="board"></div>
+    <div class="board-overlay" id="boardOverlay"></div>
+  </div>
+
+  <!-- PHRASE PANEL -->
+  <div class="phrase-panel" id="phrasePanel">
+    <div class="phrase-label">✨ Say this spell to cast the swap</div>
+    <div class="phrase-text" id="phraseText">cast the spell</div>
+    <div class="phrase-ru" id="phraseRu" style="text-align:center;color:#a78bfa;font-size:1.05em;font-weight:700;font-style:italic;margin-top:4px;margin-bottom:8px"></div>
+    <div class="timer-row">
+      <div class="timer-track">
+        <div class="timer-fill" id="timerFill" style="width:100%"></div>
+      </div>
+      <div class="timer-num" id="timerNum">8</div>
+    </div>
+    <div class="mic-row">
+      <button class="mic-btn" id="micBtn" disabled>🎤</button>
+      <span class="mic-hint" id="micHint">Tap mic · then speak the spell</span>
+    </div>
+    <div class="interim-text" id="interimText"></div>
+    <div class="feedback-row" id="feedback"></div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="bar-stat">Moves left: <span id="movesLeft">20</span></div>
+    <div class="bar-stat">Cleared: <span id="clearedVal">0</span> gems</div>
+  </div>
+
+</div>
+
+<!-- END SCREEN -->
+<div class="end-screen" id="endScreen">
+  <div class="end-title" id="endTitle">✨ LEVEL<br>COMPLETE! ✨</div>
+  <div class="end-stars" id="endStars">⭐⭐⭐</div>
+  <div class="end-score-wrap">
+    <div class="end-score-label">Final Score</div>
+    <div class="end-score-val" id="endScoreVal">0</div>
+  </div>
+  <div class="end-btns">
+    <button class="end-btn" onclick="restartGame()">▶ Play Again</button>
+    <a href="../../play.html" class="end-link">← Back to Menu</a>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════
+const ROWS = 7, COLS = 7, GEM_TYPES = 6;
+const TIMER_SEC = 8;
+const MOVE_LIMIT = 20;
+const TARGET_SCORE = 500;
+
+// A1-A2 phrases — 3-4 words, fantasy themed
+const DEFAULT_PHRASES = [
+  { text:'cast the spell',      alts:['cast the spell','cast a spell','cast this spell','cast spell'], ru:'произнести заклинание' },
+  { text:'fire ball strike',    alts:['fire ball strike','fireball strike','fire ball','fireball'], ru:'удар огненным шаром' },
+  { text:'ice wall rise',       alts:['ice wall rise','ice wall','rise ice wall'], ru:'ледяная стена поднимается' },
+  { text:'heal my wounds',      alts:['heal my wounds','heal wounds','heal me now'], ru:'исцели мои раны' },
+  { text:'shield of light',     alts:['shield of light','shield light','light shield'], ru:'щит света' },
+  { text:'thunder strike now',  alts:['thunder strike now','thunder strike','thunder now'], ru:'удар грома сейчас' },
+  { text:'open the gate',       alts:['open the gate','open gate','gate open now'], ru:'открой ворота' },
+  { text:'freeze the enemy',    alts:['freeze the enemy','freeze enemy','freeze them now'], ru:'заморозь врага' },
+  { text:'light my path',       alts:['light my path','light the path','show my path'], ru:'освети мой путь' },
+  { text:'break the curse',     alts:['break the curse','break curse','curse be broken'], ru:'сними проклятие' },
+  { text:'summon the dragon',   alts:['summon the dragon','summon dragon','call the dragon'], ru:'призови дракона' },
+  { text:'wings of fire',       alts:['wings of fire','wings fire','fire wings now'], ru:'огненные крылья' },
+  { text:'spirit of wind',      alts:['spirit of wind','spirit wind','wind spirit rise'], ru:'дух ветра' },
+  { text:'touch the crystal',   alts:['touch the crystal','touch crystal','feel the crystal'], ru:'коснись кристалла' },
+  { text:'fly away now',        alts:['fly away now','fly away','we fly now'], ru:'улетай сейчас' },
+  { text:'water and ice',       alts:['water and ice','water ice','ice and water'], ru:'вода и лёд' },
+  { text:'the spell works',     alts:['the spell works','spell works','this spell works'], ru:'заклинание работает' },
+  { text:'magic is real',       alts:['magic is real','magic real','real magic now'], ru:'магия реальна' },
+  { text:'power of earth',      alts:['power of earth','earth power','power earth now'], ru:'сила земли' },
+  { text:'rise and shine',      alts:['rise and shine','rise shine','shine and rise'], ru:'вставай и сияй' },
+];
+
+// ── Actual phrase pool used by the game: pulls from the topic selected
+// on wordlists.html. Falls back to the built-in fantasy phrases above
+// when the fantasy topic (default) is active or none is selected. ──
+function buildPhrasePool() {
+  if (typeof vgGetSelectedTopic !== 'function' || typeof vgGetTopic !== 'function') return DEFAULT_PHRASES;
+  const selected = vgGetSelectedTopic();
+  if (selected === 'fantasy') return DEFAULT_PHRASES;
+  const topic = vgGetTopic(selected);
+  if (!topic || !topic.sentences || !topic.sentences.length) return DEFAULT_PHRASES;
+  return topic.sentences.map(s => ({ text: s.text, alts: s.alts, ru: s.ru }));
+}
+const PHRASES = buildPhrasePool();
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let board = [];
+let sel1 = null, sel2 = null;
+let score = 0, moves = MOVE_LIMIT, combo = 0, cleared = 0;
+let phase = 'idle'; // idle | spell | animating
+let challengeSolved = false;
+let currentPhrase = null;
+let timerInterval = null, timerLeft = 0;
+let recognition = null, listening = false;
+let speechReady = false;
+
+// ══════════════════════════════════════════════════
+// BOARD INIT
+// ══════════════════════════════════════════════════
+function initBoard() {
+  board = [];
+  for (let r = 0; r < ROWS; r++) {
+    board.push([]);
+    for (let c = 0; c < COLS; c++) {
+      let t;
+      do {
+        t = rand(GEM_TYPES);
+      } while (
+        (c >= 2 && board[r][c-1] === t && board[r][c-2] === t) ||
+        (r >= 2 && board[r-1][c] === t && board[r-2][c] === t)
+      );
+      board[r].push(t);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════
+function renderBoard() {
+  const el = document.getElementById('board');
+  el.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = `c${r}x${c}`;
+      const t = board[r][c];
+      if (t >= 0) {
+        const gem = document.createElement('div');
+        gem.className = `gem gem-${t}`;
+        cell.appendChild(gem);
+        const rr = r, cc = c;
+        cell.addEventListener('click', () => onCellClick(rr, cc));
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function cell(r, c) { return document.getElementById(`c${r}x${c}`); }
+
+function updateCell(r, c, animate) {
+  const el = cell(r, c);
+  if (!el) return;
+  el.className = 'cell';
+  el.innerHTML = '';
+  el.onclick = null;
+  const t = board[r][c];
+  if (t >= 0) {
+    const gem = document.createElement('div');
+    gem.className = `gem gem-${t}${animate ? ' dropping' : ''}`;
+    el.appendChild(gem);
+    const rr = r, cc = c;
+    el.addEventListener('click', () => onCellClick(rr, cc));
+    if (animate) setTimeout(() => gem.classList.remove('dropping'), 300);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CLICK HANDLER
+// ══════════════════════════════════════════════════
+function onCellClick(r, c) {
+  if (phase !== 'idle') return;
+  if (board[r][c] < 0) return;
+
+  if (!sel1) {
+    sel1 = {r, c};
+    cell(r, c).classList.add('sel1');
+    return;
+  }
+
+  // Clicking same gem — deselect
+  if (sel1.r === r && sel1.c === c) {
+    cell(r, c).classList.remove('sel1');
+    sel1 = null;
+    return;
+  }
+
+  // Check adjacency
+  const dr = Math.abs(r - sel1.r), dc = Math.abs(c - sel1.c);
+  if (dr + dc !== 1) {
+    // Non-adjacent: move first selection
+    cell(sel1.r, sel1.c).classList.remove('sel1');
+    sel1 = {r, c};
+    cell(r, c).classList.add('sel1');
+    return;
+  }
+
+  // Adjacent — second gem selected
+  sel2 = {r, c};
+  cell(r, c).classList.add('sel2');
+  showSpellChallenge();
+}
+
+// ══════════════════════════════════════════════════
+// SPELL CHALLENGE
+// ══════════════════════════════════════════════════
+function showSpellChallenge() {
+  phase = 'spell';
+  // Avoid repeating the same phrase back-to-back; reset once pool is exhausted
+  if (typeof recentPhraseIdx === 'undefined') window.recentPhraseIdx = [];
+  let availableIdx = PHRASES.map((_, i) => i).filter(i => !recentPhraseIdx.includes(i));
+  if (availableIdx.length === 0) { recentPhraseIdx = []; availableIdx = PHRASES.map((_, i) => i); }
+  const pickedIdx = availableIdx[rand(availableIdx.length)];
+  recentPhraseIdx.push(pickedIdx);
+  const maxRecent = Math.max(1, PHRASES.length - 1);
+  if (recentPhraseIdx.length > maxRecent) recentPhraseIdx.shift();
+  currentPhrase = PHRASES[pickedIdx];
+
+  document.getElementById('phraseText').textContent = currentPhrase.text;
+  document.getElementById('phraseRu').textContent = currentPhrase.ru ? currentPhrase.ru.charAt(0).toUpperCase() + currentPhrase.ru.slice(1) : '';
+  challengeSolved = false;
+  speakPhrase(currentPhrase.text, () => {
+    if (phase === 'spell') {
+      if (!speechReady && !initSpeech()) return;
+      try { recognition.start(); } catch(e) {}
+    }
+  });
+  document.getElementById('phrasePanel').className = 'phrase-panel active';
+  document.getElementById('boardOverlay').classList.add('blocking');
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback-row';
+  document.getElementById('interimText').textContent = '';
+  document.getElementById('micHint').textContent = 'Tap mic · then speak the spell';
+  document.getElementById('micHint').classList.remove('active');
+
+  startTimer();
+}
+
+function hideSpellChallenge() {
+  document.getElementById('phrasePanel').className = 'phrase-panel';
+  document.getElementById('boardOverlay').classList.remove('blocking');
+  stopTimer();
+  stopListening();
+}
+
+// ══════════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════════
+function startTimer() {
+  timerLeft = TIMER_SEC;
+  renderTimer();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timerLeft -= 0.1;
+    renderTimer();
+    if (timerLeft <= 0) {
+      clearInterval(timerInterval);
+      onTimerExpired();
+    }
+  }, 100);
+}
+
+function stopTimer() { clearInterval(timerInterval); }
+
+function renderTimer() {
+  const pct = Math.max(0, timerLeft / TIMER_SEC) * 100;
+  const fill = document.getElementById('timerFill');
+  const num = document.getElementById('timerNum');
+  fill.style.width = pct + '%';
+  num.textContent = Math.ceil(Math.max(0, timerLeft));
+  const urgent = timerLeft < 3;
+  fill.className = 'timer-fill' + (urgent ? ' urgent' : '');
+  num.className = 'timer-num' + (urgent ? ' urgent' : '');
+}
+
+function onTimerExpired() {
+  stopListening();
+  setFeedback('⏰ Time\'s up! Swap cancelled.', 'wrong');
+  combo = 0;
+  setTimeout(cancelSwap, 1300);
+}
+
+// ══════════════════════════════════════════════════
+// CANCEL / CONFIRM SWAP
+// ══════════════════════════════════════════════════
+function cancelSwap() {
+  hideSpellChallenge();
+  if (sel1) { cell(sel1.r, sel1.c).classList.remove('sel1'); sel1 = null; }
+  if (sel2) { cell(sel2.r, sel2.c).classList.remove('sel2'); sel2 = null; }
+  phase = 'idle';
+}
+
+async function confirmSwap() {
+  hideSpellChallenge();
+  phase = 'animating';
+
+  // Visual deselect
+  cell(sel1.r, sel1.c).classList.remove('sel1');
+  cell(sel2.r, sel2.c).classList.remove('sel2');
+
+  const s1 = {...sel1}, s2 = {...sel2};
+  sel1 = null; sel2 = null;
+
+  // Perform swap
+  swapBoard(s1, s2);
+  updateCell(s1.r, s1.c, false);
+  updateCell(s2.r, s2.c, false);
+  await sleep(200);
+
+  // Check for matches
+  const matches = findMatches();
+  if (matches.length === 0) {
+    // Swap back — no match, spell fizzled
+    swapBoard(s1, s2);
+    updateCell(s1.r, s1.c, false);
+    updateCell(s2.r, s2.c, false);
+    await sleep(180);
+    setFeedback('💨 No match! Spell fizzled.', 'wrong');
+    combo = 0;
+    deductMove();
+    phase = 'idle';
+    setTimeout(() => clearFeedback(), 2200);
+    return;
+  }
+
+  // Cascade
+  combo = 0;
+  await cascadeLoop();
+  deductMove();
+  checkWin();
+  phase = 'idle';
+}
+
+// ══════════════════════════════════════════════════
+// SWAP BOARD DATA
+// ══════════════════════════════════════════════════
+function swapBoard(a, b) {
+  const tmp = board[a.r][a.c];
+  board[a.r][a.c] = board[b.r][b.c];
+  board[b.r][b.c] = tmp;
+}
+
+// ══════════════════════════════════════════════════
+// FIND MATCHES
+// ══════════════════════════════════════════════════
+function findMatches() {
+  const hits = new Set();
+  // Horizontal
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c <= COLS - 3; c++) {
+      const t = board[r][c];
+      if (t < 0) continue;
+      let len = 1;
+      while (c + len < COLS && board[r][c+len] === t) len++;
+      if (len >= 3) { for (let i = 0; i < len; i++) hits.add(`${r},${c+i}`); }
+    }
+  }
+  // Vertical
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r <= ROWS - 3; r++) {
+      const t = board[r][c];
+      if (t < 0) continue;
+      let len = 1;
+      while (r + len < ROWS && board[r+len][c] === t) len++;
+      if (len >= 3) { for (let i = 0; i < len; i++) hits.add(`${r+i},${c}`); }
+    }
+  }
+  return [...hits].map(s => { const [r,c] = s.split(',').map(Number); return {r,c}; });
+}
+
+// ══════════════════════════════════════════════════
+// CASCADE LOOP
+// ══════════════════════════════════════════════════
+async function cascadeLoop() {
+  let matches = findMatches();
+  while (matches.length > 0) {
+    combo++;
+    await clearMatches(matches);
+    await sleep(160);
+    dropGems();
+    fillEmpty();
+    renderBoard();
+    await sleep(240);
+    matches = findMatches();
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════
+async function clearMatches(matches) {
+  const pts = matches.length * 10 * combo;
+  score += pts;
+  cleared += matches.length;
+  updateUI();
+
+  if (combo >= 2) showCombo(combo);
+
+  // Sparkles + clearing class
+  matches.forEach(({r, c}) => {
+    spawnSparkles(r, c);
+    const el = cell(r, c);
+    if (el) el.classList.add('clearing');
+  });
+
+  setFeedback(
+    combo >= 2
+      ? `🔥 x${combo} COMBO! +${pts} pts!`
+      : `✨ +${pts} pts!`,
+    'correct'
+  );
+
+  await sleep(460);
+
+  matches.forEach(({r, c}) => { board[r][c] = -1; });
+  setTimeout(() => clearFeedback(), 2200);
+}
+
+// ══════════════════════════════════════════════════
+// DROP (gravity)
+// ══════════════════════════════════════════════════
+function dropGems() {
+  for (let c = 0; c < COLS; c++) {
+    let write = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r][c] >= 0) {
+        board[write][c] = board[r][c];
+        if (r !== write) board[r][c] = -1;
+        write--;
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// FILL
+// ══════════════════════════════════════════════════
+function fillEmpty() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c] < 0) board[r][c] = rand(GEM_TYPES);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SPARKLES
+// ══════════════════════════════════════════════════
+function spawnSparkles(r, c) {
+  const el = cell(r, c);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#f1c40f','#e056fd','#74b9ff','#55efc4','#ff8fa0','#fff','#ff6b6b'];
+  for (let i = 0; i < 7; i++) {
+    const p = document.createElement('div');
+    p.className = 'sparkle';
+    p.style.background = colors[rand(colors.length)];
+    const angle = (i / 7) * Math.PI * 2 + Math.random() * .5;
+    const dist = 18 + Math.random() * 22;
+    p.style.left = (cx + Math.cos(angle) * dist) + 'px';
+    p.style.top = (cy + Math.sin(angle) * dist) + 'px';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 600);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// COMBO BADGE
+// ══════════════════════════════════════════════════
+function showCombo(n) {
+  const el = document.getElementById('comboBadge');
+  el.textContent = `⚡ x${n} COMBO!`;
+  el.style.display = 'inline-block';
+  el.style.animation = 'none';
+  void el.offsetHeight;
+  el.style.animation = 'comboPop .4s ease';
+  setTimeout(() => { el.style.display = 'none'; }, 1600);
+}
+
+// ══════════════════════════════════════════════════
+// MOVES & WIN
+// ══════════════════════════════════════════════════
+function deductMove() {
+  moves--;
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('movesVal').textContent = moves;
+  document.getElementById('movesLeft').textContent = moves;
+  document.getElementById('clearedVal').textContent = cleared;
+}
+
+function checkWin() {
+  if (score >= TARGET_SCORE) {
+    setTimeout(() => showEnd(true), 400);
+  } else if (moves <= 0) {
+    setTimeout(() => showEnd(false), 400);
+  }
+}
+
+function showEnd(win) {
+  phase = 'animating';
+  if (window.VG) window.VG.saveScore('spell-match3', score);
+  const screen = document.getElementById('endScreen');
+  screen.className = 'end-screen show';
+  const title = document.getElementById('endTitle');
+  if (win) {
+    title.textContent = '✨ LEVEL COMPLETE! ✨';
+    title.style.color = '#d4a4ff';
+    document.getElementById('endStars').textContent =
+      score >= TARGET_SCORE * 1.5 ? '⭐⭐⭐' :
+      score >= TARGET_SCORE * 1.2 ? '⭐⭐' : '⭐';
+  } else {
+    title.textContent = '💀 GAME OVER 💀';
+    title.style.color = '#e74c3c';
+    document.getElementById('endStars').textContent = '💔';
+  }
+  document.getElementById('endScoreVal').textContent = score + ' pts';
+}
+
+function restartGame() {
+  document.getElementById('endScreen').className = 'end-screen';
+  score = 0; moves = MOVE_LIMIT; combo = 0; cleared = 0;
+  phase = 'idle'; sel1 = null; sel2 = null;
+  document.getElementById('comboBadge').style.display = 'none';
+  hideSpellChallenge();
+  initBoard();
+  renderBoard();
+  updateUI();
+}
+
+// ══════════════════════════════════════════════════
+// FEEDBACK
+// ══════════════════════════════════════════════════
+function setFeedback(msg, type) {
+  const el = document.getElementById('feedback');
+  el.textContent = msg;
+  el.className = 'feedback-row ' + (type || '');
+}
+function clearFeedback() {
+  const el = document.getElementById('feedback');
+  if (el.textContent) { el.textContent = ''; el.className = 'feedback-row'; }
+}
+
+// ══════════════════════════════════════════════════
+// SPEECH RECOGNITION
+// ══════════════════════════════════════════════════
+function initSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    document.getElementById('micHint').textContent = '❌ Use Chrome or Edge';
+    return false;
+  }
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 5;
+
+  recognition.onstart = () => {
+    listening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micHint').textContent = '🔴 Listening...';
+    document.getElementById('micHint').classList.add('active');
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micHint').textContent = 'Listen, then speak the spell';
+    document.getElementById('micHint').classList.remove('active');
+    document.getElementById('interimText').textContent = '';
+    if (phase === 'spell' && !challengeSolved) {
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    setFeedback('⚠️ Mic: ' + e.error, 'wrong');
+  };
+
+  recognition.onresult = (e) => {
+    const idx = e.resultIndex;
+    const alts = Array.from(e.results[idx]).map(r => r.transcript.toLowerCase().trim());
+
+    if (!e.results[idx].isFinal) {
+      document.getElementById('interimText').textContent = '"' + alts[0] + '"';
+      return;
+    }
+    document.getElementById('interimText').textContent = '';
+    if (phase !== 'spell') return;
+
+    // Stop mic immediately on final result (select-then-speak: one shot per action)
+    stopListening();
+
+    const ok = phraseMatches(alts, currentPhrase);
+    if (ok) {
+      challengeSolved = true;
+      if (window.VG && typeof VG.recordWordSaid === 'function' && typeof vgGetSelectedTopic === 'function') {
+        VG.recordWordSaid(vgGetSelectedTopic(), currentPhrase.text);
+      }
+      stopTimer();
+      setFeedback('✅ Spell cast! Swapping...', 'correct');
+      setTimeout(() => confirmSwap(), 550);
+    } else {
+      setFeedback(`❌ Heard: "${alts[0]}" — try again!`, 'wrong');
+    }
+  };
+
+  speechReady = true;
+  return true;
+}
+
+function toggleMic() {
+  if (phase !== 'spell') return;
+  if (!speechReady && !initSpeech()) return;
+  if (listening) {
+    stopListening();
+  } else {
+    try { recognition.start(); } catch(e) {}
+  }
+}
+
+function stopListening() {
+  if (listening && recognition) {
+    try { recognition.stop(); } catch(e) {}
+    listening = false;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// VOICE-OVER — speak the target sentence aloud
+// ══════════════════════════════════════════════════
+function speakPhrase(text, onDone) {
+  if (!('speechSynthesis' in window)) { if (onDone) setTimeout(onDone, 0); return; }
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'en-US';
+  utt.onend = () => { if (onDone) setTimeout(onDone, 300); };
+  window.speechSynthesis.speak(utt);
+}
+
+// ══════════════════════════════════════════════════
+// PHRASE MATCHING
+// ══════════════════════════════════════════════════
+function phraseMatches(spokenAlts, phrase) {
+  for (const spoken of spokenAlts) {
+    // Check against all phonetic alternatives
+    for (const alt of phrase.alts) {
+      if (fuzzScore(spoken, alt) >= 0.68) return true;
+    }
+    // Word-level fallback: if enough content words match
+    const targetWords = phrase.text.replace(/\b(the|a|an|of|my|and)\b/g, '').trim().split(/\s+/).filter(w => w.length > 1);
+    const spokenWords = spoken.split(/\s+/);
+    let hits = 0;
+    for (const tw of targetWords) {
+      for (const sw of spokenWords) {
+        if (fuzzScore(sw, tw) >= 0.78) { hits++; break; }
+      }
+    }
+    if (hits >= Math.max(1, Math.ceil(targetWords.length * 0.55))) return true;
+  }
+  return false;
+}
+
+function fuzzScore(a, b) {
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.92;
+  const d = levenshtein(a, b);
+  return Math.max(0, 1 - d / Math.max(a.length, b.length, 1));
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) =>
+    Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+// ══════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════
+function rand(n) { return Math.floor(Math.random() * n); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+initBoard();
+renderBoard();
+updateUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+
+node "GitLab CI/CD Pipeline" as GitLabCI {
+  [Build & Test Jobs] --> [GitLab Pages Artifact]
+}
+
+cloud "GitLab Pages (HTTPS)" as GitLabPages {
+  [HTML / CSS / JS Files] as Files
+}
+
+node "Child's Device" as Device {
+  node "Browser\n(Chrome/Firefox)" as Browser {
+    component "Voice Games MVP" as App
+    database "LocalStorage" as DB
+  }
+  
+  component "Microphone" as Mic
+}
+
+Files --> App : Download via HTTPS
+App --> Mic : Request audio access
+App --> DB : Save game progress
+
+note bottom of Files
+  No backend server required.
+  HTTPS is mandatory for
+  Web Speech API to work.
+end note
+@enduml
