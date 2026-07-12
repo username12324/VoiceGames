@@ -1511,7 +1511,8 @@
 
     // Fish journal: map fish id → catch count
     let journal = {};
-    FISH_DB.forEach(f => journal[f.id] = 0);
+    const savedJournal = JSON.parse(localStorage.getItem('voice-angler-journal') || 'null');
+    FISH_DB.forEach(f => journal[f.id] = (savedJournal && savedJournal[f.id]) || 0);
 
     // Timers
     let gameTimer = null;
@@ -1684,12 +1685,10 @@
     function onWaterClick(e) {
       if (gamePhase === 'challenge') return;
       if (gamePhase === 'bite') {
-        // Clicked water (not bobber) during bite — let the fish escape,
-        // then fall through so the click can immediately start a new cast.
-        clearTimeout(biteEscapeTimeout);
-        biteAlertEl.style.display = 'none';
-        hideBobber();
-        gamePhase = 'idle';
+        // Misclick near the bobber during a bite — ignore it entirely.
+        // The bobber stays put; only clicking it (onBobberClick) catches
+        // the fish, and only the bite timer lets it escape.
+        return;
       }
 
       // During waiting or swimming, re-casting resets
@@ -1882,6 +1881,7 @@
         if (gamePhase === 'challenge') {
           if (!speechReady && !initSpeech()) return;
           try { recognition.start(); } catch (e) {}
+          startChallengeTimer(currentFish.timer);
         }
       });
 
@@ -1899,9 +1899,6 @@
 
       // Show panel
       challengePanelEl.classList.add('visible');
-
-      // Start countdown
-      startChallengeTimer(currentFish.timer);
     }
 
     function hideChallenge() {
@@ -1956,6 +1953,7 @@
       if (success) {
         // Record catch
         journal[currentFish.id]++;
+      localStorage.setItem('voice-angler-journal', JSON.stringify(journal));
         const pts = rarityPoints(currentFish.rarity);
         score += pts;
         totalCaught++;

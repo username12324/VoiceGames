@@ -3,6 +3,11 @@
 - **Priority (MoSCoW):** [Must Have / Should Have / Could Have]
 - **Story Points:** 
 - **MVP Version:** [v1 / v2 / v3]
+- **Requirement Status:** [Active / Removed]
+- **Work Status:** [To Do / Ready / In Progress / Review / Done]
+- **Sprint / Milestone:** 
+- **Implementer:** @username
+- **Reviewer:** @username
 
 ## Statement
 **As a** [role],
@@ -20,4 +25,4 @@
 - **Open Questions:** 
 
 ## Review
-- **Assigned Reviewer:** @username
+- **Verification evidence:** [linked PBIs, MRs, tests, CI jobs, UAT, screenshots, or documentation evidence]

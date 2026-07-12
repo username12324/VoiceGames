@@ -3,5 +3,8 @@ exclude = [
     'https://gitlab.pg.innopolis.university/.*',
     'https://t.me/.*',
     'https://docs.google.com/.*',
-    'http://10\.93\.26\.179/.*'
+    'https://drive\.google\.com/.*',
+    'http://10\.93\.26\.179/.*',
+    'http://localhost.*',
+    'http://127\.0\.0\.1.*'
 ]
