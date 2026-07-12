@@ -143,7 +143,12 @@ function vgDefaultProgress() {
             'voice-angler': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
             'voice-magic': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
             'picture-sentence': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
-            'spell-match3': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null }
+            'spell-match3': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
+            'voice-f1': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
+            'rpg-boss': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
+            'voice-tower-defense': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
+            'word-racer': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null },
+            'stream-room': { bestScore: 0, totalScore: 0, plays: 0, lastPlayed: null }
         },
         wordLists: {},        // { gameId: { listId: {...} } } — populated by word-list feature
         wordCounts: {},        // { topicId: { wordOrPhraseKey: count } } — how many times each word/phrase was said

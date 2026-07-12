@@ -49,6 +49,9 @@ pages:
     - mkdir -p public
     - cp index.html play.html wordlists.html public/
     - cp -r games public/
+    - cp -r docs public/
+    - cp -r reports public/
+    - cp README.md CHANGELOG.md LICENSE Process_Requirements.md public/
   artifacts:
     paths:
       - public

@@ -46,3 +46,30 @@ This document defines the active end-user-facing User Acceptance Test (UAT) scen
 *   **Execution Status (Week 4 Review):**
     - **Status:** **Passed with Visual Improvements**.
     - **Notes:** The customer caught fish and approved the loop. Requested shifting the pier graphic to a boat above the waves to prevent the fish path line from overlapping the pier.
+
+---
+
+## Scenario UAT-4: Word List — Pronunciation Feedback
+*   **Traceability:** User Story US-02 / Sprint 3 PBI 2
+*   **Preconditions:** The application is running, sound is enabled on the device.
+*   **Steps:**
+    1. Navigate to the Word List menu.
+    2. Click on any English vocabulary word (e.g., "Apple").
+*   **Expected Result:** The application uses the Text-to-Speech API to pronounce the word clearly in English.
+*   **Execution Status (Week 5 Review):**
+    - **Status:** **[To Be Executed]**
+    - **Notes:** Verified by the team; pending customer UAT during Sprint 3 Review.
+
+---
+
+## Scenario UAT-5: Gameplay — Generic Word-by-Word Parsing
+*   **Traceability:** Sprint 3 PBI 1
+*   **Preconditions:** The application is running, microphone permission is granted.
+*   **Steps:**
+    1. Open any game requiring speech input (e.g., Heroes of Voice & Magic).
+    2. Attempt to pronounce a multi-word sequence or a single word.
+    3. Introduce a slight pause between words.
+*   **Expected Result:** The system parses the speech input sequentially without hardcoded logic separating "sentences" from "words", adapting fluidly to the user's pace and triggering the correct game state.
+*   **Execution Status (Week 5 Review):**
+    - **Status:** **[To Be Executed]**
+    - **Notes:** Verified by the team; pending customer UAT during Sprint 3 Review.

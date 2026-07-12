@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-mvp2] - 2026-07-05
+
+### Added
+- Text-to-Speech (TTS) pronunciation feedback when clicking on words in the Vocabulary Lists.
+- Formal Architecture Decision Records (ADRs) and architectural view diagrams (Static, Dynamic, Deployment).
+- Maintained development-process and configuration-management documentation in `docs/development-process.md`.
+- Hosted documentation index in `docs/index.html` and repository documentation index in `docs/README.md`.
+- GitLab issue templates for Other PBI, Course Task, and Bug Report workflows.
+- Week 5 public report entry linking the maintained process artifact.
+
+### Changed
+- Refactored core parsing logic to decouple and split sentences generically (word-by-word), moving away from strict hardcoded "words" vs "sentences" handling.
+- GitLab Pages deployment now includes maintained documentation and public reports.
+- Root README and hosted navigation now link to the development-process documentation.
+- Root README now includes local setup instructions.
+- Merge request template now prompts for related issue, acceptance-criteria verification, and changelog applicability.
+- User story issue template now captures requirement status, Work Status, Sprint, implementer, reviewer, and verification evidence.
+
 ## [2.0.0-mvp2] - 2026-06-28
 
 ### Added

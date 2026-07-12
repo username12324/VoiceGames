@@ -619,6 +619,7 @@ function showSpellChallenge() {
     if (phase === 'spell') {
       if (!speechReady && !initSpeech()) return;
       try { recognition.start(); } catch(e) {}
+      startTimer();
     }
   });
   document.getElementById('phrasePanel').className = 'phrase-panel active';
@@ -628,8 +629,6 @@ function showSpellChallenge() {
   document.getElementById('interimText').textContent = '';
   document.getElementById('micHint').textContent = 'Tap mic · then speak the spell';
   document.getElementById('micHint').classList.remove('active');
-
-  startTimer();
 }
 
 function hideSpellChallenge() {

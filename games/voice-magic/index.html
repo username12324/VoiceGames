@@ -209,6 +209,22 @@ body {
 }
 @keyframes bonusGlow { 0%,100%{box-shadow:0 0 8px rgba(255,204,2,0.3)} 50%{box-shadow:0 0 20px rgba(255,204,2,0.7)} }
 .bonus-spell h4 { font-size:0.72em; color:#ffcc02; font-weight:700; margin-bottom:4px; }
+.spell-challenge {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: #16162e; border: 2px solid #e040fb; border-radius: 16px;
+  padding: 16px 20px; z-index: 400; width: min(90vw, 420px); text-align:center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.spell-challenge h4 { color:#e040fb; margin-bottom:8px; font-size:0.85em; }
+.challenge-hint-word {
+  background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);
+  border-radius: 10px; padding: 4px 10px; font-size:0.8em; font-weight:700; color:#fff;
+  display:inline-block;
+}
+.challenge-cancel-btn {
+  margin-top:8px; background:transparent; border:1px solid #666; color:#999;
+  font-size:0.65em; padding:4px 10px; border-radius:12px; cursor:pointer;
+}
 .bonus-word { font-size:1.1em; font-weight:700; color:#fff; letter-spacing:2px; text-align:center; margin:4px 0; }
 .bonus-stats { display:flex; justify-content:space-around; font-size:0.62em; }
 .bonus-stats span { color:#ffcc02; }
@@ -258,8 +274,8 @@ body {
 .end-screen p { color:#aaa; }
 .end-screen button { background:linear-gradient(135deg,#e040fb,#7c4dff); border:none; color:#fff; padding:12px 28px; border-radius:12px; font-size:1em; cursor:pointer; }
 </style>
-<script src="../shared/utils.js"></script>
-<script src="../shared/wordlists.js"></script>
+<script src="/games/shared/utils.js"></script>
+<script src="/games/shared/wordlists.js"></script>
 </head>
 <body>
 <a href="../../play.html" style="position:fixed;top:16px;left:16px;z-index:300;display:flex;align-items:center;gap:8px;background:#1c1c3a;border:1px solid #2a2a4a;color:#ccc;padding:8px 16px;border-radius:50px;font-size:0.85em;font-weight:700;text-decoration:none;transition:all 0.2s" onmouseover="this.style.borderColor='#e040fb';this.style.color='#e040fb'" onmouseout="this.style.borderColor='#2a2a4a';this.style.color='#ccc'">← Menu</a>
@@ -332,6 +348,17 @@ body {
     </div>
     <button onclick="event.stopPropagation();activateBonus()" style="margin-top:6px;background:linear-gradient(135deg,#ffcc02,#ff6d00);border:none;color:#000;font-weight:900;font-size:0.78em;padding:5px 14px;border-radius:20px;cursor:pointer">👆 Tap to activate</button>
     <div class="bonus-timer" id="bonusTimer">Expires in 15s</div>
+  </div>
+
+  <!-- SPELL CHALLENGE -->
+  <div class="spell-challenge" id="spellChallenge" style="display:none">
+    <h4 id="challengeType">⚔️ Attack Spell</h4>
+    <div id="challengeSentence" style="font-size:0.95em;font-weight:700;color:#fff;text-align:center;margin:6px 0"></div>
+    <div id="challengeSentenceRu" style="font-size:0.7em;color:#aaa;text-align:center;margin-bottom:6px;font-style:italic"></div>
+    <div id="challengeHints" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0"></div>
+    <div id="challengeFeedback" style="min-height:20px;text-align:center;font-size:0.8em;margin-top:4px"></div>
+    <div style="text-align:center;margin-top:4px;font-size:0.65em;color:#888">🎤 Say the missing word — closer guesses cast stronger spells!</div>
+    <button class="challenge-cancel-btn" onclick="hideSpellChallenge()">Cancel</button>
   </div>
 
   <!-- SPELL TABLES -->
@@ -488,14 +515,16 @@ const DEFAULT_WORD_POOL = {
 
 // ── Actual word pool used by the game: pulls from the topic selected on
 // wordlists.html. Falls back to the rich 100-word fantasy list above
-// when the fantasy topic (default) is active. Other topics use the
-// shared topic vocabulary from games/shared/wordlists.js. ──
+// when the fantasy topic (default) is active. Other topics derive their
+// vocabulary generically by splitting that topic's sentences into words
+// (filler words like "the"/"a"/"is" removed) and randomly distributing
+// them across attack/defend/heal — no hand-authored word lists needed. ──
 function buildWordPool() {
   const selected = (typeof vgGetSelectedTopic === 'function') ? vgGetSelectedTopic() : 'fantasy';
-  if (selected === 'fantasy' || typeof vgGetTopic !== 'function') return DEFAULT_WORD_POOL;
-  const topic = vgGetTopic(selected);
-  if (!topic || !topic.words) return DEFAULT_WORD_POOL;
-  return topic.words;
+  if (selected === 'fantasy' || typeof vgGetCategorizedWords !== 'function') return DEFAULT_WORD_POOL;
+  const categorized = vgGetCategorizedWords(selected);
+  if (!categorized || (!categorized.attack.length && !categorized.defend.length && !categorized.heal.length)) return DEFAULT_WORD_POOL;
+  return categorized;
 }
 const WORD_POOL = buildWordPool();
 
@@ -733,38 +762,77 @@ function renderAll() {
   });
 }
 
+const BASE_SPELL = {
+  attack: { power: 45, cost: 15, label: 'Cast Attack', icon: '💥' },
+  defend: { power: 30, cost: 15, label: 'Cast Defense', icon: '🛡️' },
+  heal:   { power: 40, cost: 15, label: 'Cast Heal',    icon: '💚' },
+};
 function renderSpellTables() {
   ['attack','defend','heal'].forEach(type=>{
     const container=document.getElementById(type==='attack'?'atkSpells':type==='defend'?'defSpells':'healSpells');
     container.innerHTML='';
-    SPELLS[type].forEach((spell,i)=>{
-      const div=document.createElement('div');
-      div.className='spell-card-item';
-      div.id='spell-'+type+'-'+i;
-      const affordable=G.hero.energy>=spell.cost;
-      div.style.opacity=affordable?'1':'0.4';
-      const icon=type==='attack'?'💥':type==='defend'?'🛡️':'💚';
-      div.innerHTML=`
-        <div class="spell-word-row">
-          <span class="spell-word" title="Tap card to hear it in English">${spell.word}</span>
-          <button class="word-speak-btn" data-say-ru title="Hear Russian translation">🔊 RU</button>
-        </div>
-        <div class="spell-ru">${spell.ru || ''}</div>
-        <div class="spell-stats">
-          <span class="spell-power">${icon} ${spell.power}</span>
-          <span class="spell-cost">⚡${spell.cost}</span>
-        </div>
-        <div style="font-size:0.58em;color:#888;margin-top:1px">${spell.label}</div>
-      `;
-      div.querySelector('[data-say-ru]').onclick=(ev)=>{ ev.stopPropagation(); speakRussian(spell.ru); };
-      div.onclick=()=>selectSpell(type,i);
-      if(G.selectedSpell===spell) {
-        div.classList.add('selected');
-        div.classList.add(type==='attack'?'atk-sel':type==='defend'?'def-sel':'heal-sel');
-      }
-      container.appendChild(div);
-    });
+    const base=BASE_SPELL[type];
+    const affordable=G.hero.energy>=base.cost;
+    const div=document.createElement('div');
+    div.className='spell-card-item';
+    div.style.opacity=affordable?'1':'0.4';
+    div.innerHTML=`
+      <div style="text-align:center;font-size:1.6em">${base.icon}</div>
+      <div style="font-size:0.72em;font-weight:700;color:#fff;text-align:center;margin-top:2px">${base.label}</div>
+      <div class="spell-stats" style="margin-top:4px">
+        <span class="spell-power">${base.icon} up to ${base.power}</span>
+        <span class="spell-cost">⚡${base.cost}</span>
+      </div>
+    `;
+    div.onclick=()=>{ if(affordable) showSpellChallenge(type); else setFeedback('⚡ Not enough energy!','wrong'); };
+    container.appendChild(div);
   });
+}
+function shuffleArray(arr) {
+  for (let i=arr.length-1;i>0;i--) {
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+function showSpellChallenge(type) {
+  if (G.gameOver) return;
+  const topicId=(typeof vgGetSelectedTopic==='function')?vgGetSelectedTopic():'fantasy';
+  const topic=(typeof vgGetTopic==='function')?vgGetTopic(topicId):null;
+  const sentences=(topic && topic.sentences && topic.sentences.length)?topic.sentences:VG_TOPICS.fantasy.sentences;
+  const sentence=sentences[Math.floor(Math.random()*sentences.length)];
+  const words=(typeof vgExtractWordsFromSentence==='function')?vgExtractWordsFromSentence(sentence):[];
+  if (!words.length) { setFeedback('No vocabulary available for this topic.','info'); return; }
+  const target=words[Math.floor(Math.random()*words.length)];
+  const re=new RegExp('\\b'+target.word+'\\b','i');
+  const blankText=sentence.text.replace(re,'_____');
+  const pool=(typeof vgGetWordsFromTopic==='function')?vgGetWordsFromTopic(topicId):[];
+  const distractors=shuffleArray(pool.filter(w=>w.word!==target.word));
+  const hints=shuffleArray([target,...distractors.slice(0,2)]);
+
+  G.challenge={type,target,sentence,hints};
+
+  document.getElementById('challengeType').textContent=
+    type==='attack'?'⚔️ Attack Spell':type==='defend'?'🛡️ Defense Spell':'💚 Heal Spell';
+  document.getElementById('challengeSentence').textContent=blankText;
+  document.getElementById('challengeSentenceRu').textContent=sentence.ru||'';
+  const hintsEl=document.getElementById('challengeHints');
+  hintsEl.innerHTML='';
+  hints.forEach(h=>{
+    const span=document.createElement('span');
+    span.className='challenge-hint-word';
+    span.textContent=h.word;
+    hintsEl.appendChild(span);
+  });
+  document.getElementById('challengeFeedback').textContent='';
+  document.getElementById('spellChallenge').style.display='block';
+
+  if (!recognition && !initSpeech()) return;
+  if (!G.listening) { G.listening=true; try { recognition.start(); } catch(e) {} }
+}
+function hideSpellChallenge() {
+  document.getElementById('spellChallenge').style.display='none';
+  G.challenge=null;
 }
 
 function speakRussian(text) {
@@ -825,6 +893,9 @@ function showPopup(text, color, x, y) {
 function castSpell(spell, type) {
   G.hero.energy=Math.max(0,G.hero.energy-spell.cost);
   addScore(10 + Math.round(spell.cost / 2));
+  if (window.VG && typeof VG.recordWordSaid === 'function' && typeof vgGetSelectedTopic === 'function') {
+    VG.recordWordSaid(vgGetSelectedTopic(), spell.word);
+  }
 
   if(type==='attack'){
     const target=G.enemies.find(e=>e.alive);
@@ -1093,6 +1164,53 @@ function initSpeech() {
     if(!results.isFinal){ document.getElementById('interimText').textContent=alts[0].transcript; return; }
     document.getElementById('interimText').textContent='';
     if(!G.playerTurn||G.gameOver) return;
+
+
+    if (G.challenge) {
+      const heard = (alts[0].transcript || '').trim().toLowerCase();
+      const targetWord = G.challenge.target.word.toLowerCase();
+      const hints = G.challenge.hints || [G.challenge.target];
+
+      let bestHintSim = 0;
+      hints.forEach(h => {
+        const hw = (h.word || '').toLowerCase();
+        const d = levenshtein(heard, hw);
+        const m = Math.max(heard.length, hw.length, 1);
+        const sim = Math.max(0, 1 - d / m);
+        if (sim > bestHintSim) bestHintSim = sim;
+      });
+
+      const RECOGNITION_THRESHOLD = 0.6;
+      const fb = document.getElementById('challengeFeedback');
+      if (bestHintSim < RECOGNITION_THRESHOLD) {
+        if (fb) fb.textContent = '\u2753 "' + heard + '" \u2014 say one of the three words shown';
+        return;
+      }
+
+      const dist = levenshtein(heard, targetWord);
+      const maxLen = Math.max(heard.length, targetWord.length, 1);
+      const similarity = Math.max(0, 1 - dist / maxLen);
+      const pct = Math.round(similarity * 100);
+      const type = G.challenge.type;
+      const base = BASE_SPELL[type];
+      const scaledPower = Math.max(1, Math.round(base.power * similarity));
+      const synthSpell = {
+        word: G.challenge.target.word,
+        ru: G.challenge.target.ru || G.challenge.sentence.ru || '',
+        power: scaledPower,
+        cost: base.cost,
+        label: base.label + ' (' + pct + '% match)'
+      };
+      if (fb) {
+        const check = '\u2705', loop = '\u27B0', cross = '\u274C', dash = '\u2014';
+        fb.textContent = similarity >= 0.9 ? (check + ' "' + heard + '" ' + dash + ' ' + pct + '% match!')
+                        : similarity >= 0.5 ? (loop + ' "' + heard + '" ' + dash + ' ' + pct + '% match')
+                        : (cross + ' "' + heard + '" ' + dash + ' ' + pct + '% match');
+      }
+      hideSpellChallenge();
+      castSpell(synthSpell, type);
+      return;
+    }
 
     const targets=getAllTargets();
     const match=bestMatch(alts,targets);

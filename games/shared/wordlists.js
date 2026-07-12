@@ -243,23 +243,186 @@ const VG_TOPIC_LIST = Object.values(VG_TOPICS);
 function vgGetSelectedTopic() {
     if (window.VG && typeof window.VG.getWordList === 'function') {
         const saved = window.VG.getWordList('_global', 'selectedTopic');
-        if (saved && saved[0] && VG_TOPICS[saved[0]]) return saved[0];
+        if (saved && saved[0]) {
+            const id = saved[0];
+            // Valid if it's a built-in topic OR a saved custom topic
+            if (VG_TOPICS[id]) return id;
+            const customTopics = (typeof vgLoadCustomTopics === 'function') ? vgLoadCustomTopics() : [];
+            if (customTopics.some(t => t.id === id)) return id;
+        }
     }
     return 'fantasy';
 }
 
 function vgSetSelectedTopic(topicId) {
-    if (!VG_TOPICS[topicId]) return;
+    const validIds = new Set(vgGetAllTopics().map(t => t.id));
+    if (!validIds.has(topicId)) return;
     if (window.VG && typeof window.VG.saveWordList === 'function') {
         window.VG.saveWordList('_global', 'selectedTopic', [topicId]);
     }
 }
 
+// ── CUSTOM TOPICS (user-created word lists) ────────────────────
+// Stored separately from the built-in topics so they survive being
+// added/removed independently. Each custom topic has the same shape
+// as a built-in one: { id, name, emoji, sentences: [{text, ru, alts}] }
+const VG_CUSTOM_TOPICS_KEY = 'vg_custom_topics_v1';
+
+function vgLoadCustomTopics() {
+    try {
+        const raw = localStorage.getItem(VG_CUSTOM_TOPICS_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function vgSaveCustomTopics(topics) {
+    try {
+        localStorage.setItem(VG_CUSTOM_TOPICS_KEY, JSON.stringify(topics));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Creates a new empty custom topic and returns it.
+function vgCreateCustomTopic(name, emoji) {
+    const topics = vgLoadCustomTopics();
+    const topic = {
+        id: 'custom_' + Date.now(),
+        name: name || 'My List',
+        emoji: emoji || '📝',
+        sentences: [],
+    };
+    topics.push(topic);
+    vgSaveCustomTopics(topics);
+    return topic;
+}
+
+function vgDeleteCustomTopic(topicId) {
+    const topics = vgLoadCustomTopics().filter(t => t.id !== topicId);
+    vgSaveCustomTopics(topics);
+}
+
+// Adds a phrase to a custom topic. alts default to just the phrase itself
+// (lowercased) if not provided — this is enough for exact-ish matching;
+// games' fuzzy matching still tolerates minor mis-hearings.
+function vgAddPhraseToTopic(topicId, text, ru) {
+    const topics = vgLoadCustomTopics();
+    const topic = topics.find(t => t.id === topicId);
+    if (!topic) return false;
+    const cleanText = (text || '').trim();
+    if (!cleanText) return false;
+    topic.sentences.push({
+        text: cleanText,
+        ru: (ru || '').trim(),
+        alts: [cleanText.toLowerCase()],
+    });
+    vgSaveCustomTopics(topics);
+    return true;
+}
+
+function vgRemovePhraseFromTopic(topicId, index) {
+    const topics = vgLoadCustomTopics();
+    const topic = topics.find(t => t.id === topicId);
+    if (!topic) return false;
+    topic.sentences.splice(index, 1);
+    vgSaveCustomTopics(topics);
+    return true;
+}
+
+// All topics available for selection: built-in + custom, in one list.
+function vgGetAllTopics() {
+    return [...VG_TOPIC_LIST, ...vgLoadCustomTopics()];
+}
+
 function vgGetTopic(topicId) {
-    return VG_TOPICS[topicId] || VG_TOPICS.fantasy;
+    if (VG_TOPICS[topicId]) return VG_TOPICS[topicId];
+    const custom = vgLoadCustomTopics().find(t => t.id === topicId);
+    if (custom) return custom;
+    return VG_TOPICS.fantasy;
+}
+
+// ── GENERIC SENTENCE → WORD HANDLING ────────────────────────────
+// Stop treating "sentences" as a special case: every sentence is just
+// a sequence of words. This splits a topic's sentences into individual
+// {word, ru} entries, filtering out short filler words (the, a, an, is,
+// etc.) that aren't useful vocabulary on their own.
+const VG_FILLER_WORDS_EN = new Set([
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'am', 'be', 'been',
+    'of', 'in', 'on', 'at', 'to', 'it', 'my', 'i', 'we', 'he', 'she',
+    'this', 'that', 'and', 'or', 'do', 'does', 'did'
+]);
+
+const VG_FILLER_WORDS_RU = new Set([
+    'в', 'на', 'и', 'а', 'у', 'к', 'с', 'о', 'об', 'это',
+    'я', 'мы', 'он', 'она', 'они', 'ты', 'вы',
+    'мой', 'моя', 'моё', 'мои'
+]);
+
+// Splits a sentence into filtered word pairs. Fillers are removed
+// independently on each language's word list (not by shared index),
+// then the remaining content words are paired up by their new position.
+// This keeps English/Russian words correctly aligned even when a filler
+// appears in one language but not at the exact same slot in the other.
+function vgExtractWordsFromSentence(sentence) {
+    // sentence: { text, ru, alts }
+    const cleanEn = sentence.text.split(/\s+/)
+        .map(w => w.toLowerCase().replace(/[^a-z]/gi, ''))
+        .filter(w => w.length > 0 && !VG_FILLER_WORDS_EN.has(w));
+
+    const cleanRu = (sentence.ru || '').split(/\s+/)
+        .map(w => w.toLowerCase().replace(/[^а-яё]/gi, ''))
+        .filter(w => w.length > 0 && !VG_FILLER_WORDS_RU.has(w));
+
+    const out = [];
+    const len = Math.min(cleanEn.length, cleanRu.length);
+    for (let i = 0; i < len; i++) {
+        out.push({ word: cleanEn[i], ru: cleanRu[i] });
+    }
+    return out;
+}
+
+// Builds a generic, deduplicated word pool for a topic by splitting every
+// sentence into its component words (fillers removed). This is the single
+// source of vocabulary — no separate hand-authored "words" list needed.
+function vgGetWordsFromTopic(topicId) {
+    const topic = vgGetTopic(topicId);
+    if (!topic || !topic.sentences) return [];
+    const seen = new Set();
+    const words = [];
+    topic.sentences.forEach(s => {
+        vgExtractWordsFromSentence(s).forEach(w => {
+            if (!seen.has(w.word)) {
+                seen.add(w.word);
+                words.push(w);
+            }
+        });
+    });
+    return words;
+}
+
+// Randomly assigns a topic's derived words into attack/defend/heal
+// categories (roughly even split) — used by Heroes so every spell slot
+// still has a word to draw from, without needing hand-authored categories.
+function vgGetCategorizedWords(topicId) {
+    const words = vgGetWordsFromTopic(topicId);
+    // Shuffle
+    const shuffled = [...words];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const third = Math.ceil(shuffled.length / 3);
+    return {
+        attack: shuffled.slice(0, third),
+        defend: shuffled.slice(third, third * 2),
+        heal: shuffled.slice(third * 2),
+    };
 }
 
 // Export for Node (Jest) and browser
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { VG_TOPICS, VG_TOPIC_LIST, vgGetSelectedTopic, vgSetSelectedTopic, vgGetTopic };
+    module.exports = { VG_TOPICS, VG_TOPIC_LIST, vgGetSelectedTopic, vgSetSelectedTopic, vgGetTopic, vgExtractWordsFromSentence, vgGetWordsFromTopic, vgGetCategorizedWords, vgLoadCustomTopics, vgSaveCustomTopics, vgCreateCustomTopic, vgDeleteCustomTopic, vgAddPhraseToTopic, vgRemovePhraseFromTopic, vgGetAllTopics };
 }
