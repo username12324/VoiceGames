@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stream Room — VoiceGames</title>
+  <meta name="description" content="Стань стримером! Произноси английские слова и смотри, как чат радуется.">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #050510;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; overflow: hidden;
+    }
+
+    /* ── 16:9 SHELL ── */
+    #game-shell {
+      width: min(100vw, 177.78vh);
+      height: min(100vh, 56.25vw);
+      position: relative;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── BACK LINK ── */
+    .menu-btn {
+      position: fixed; top: 10px; left: 10px; z-index: 999;
+      font-family: 'Press Start 2P', monospace; font-size: 0.45rem;
+      background: #1a1a2e; border: 2px solid #444; color: #777;
+      padding: 6px 12px; text-decoration: none; transition: all 0.2s;
+    }
+    .menu-btn:hover { color: #a78bfa; border-color: #a78bfa; }
+
+    /* ══════════════════════════════════════
+       HUD (top bar)
+    ══════════════════════════════════════ */
+    #hud {
+      height: 50px; flex-shrink: 0;
+      background: #0d0d22;
+      border-bottom: 2px solid rgba(139,92,246,0.35);
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 14px 0 70px; z-index: 100;
+    }
+
+    /* LIVE badge */
+    .live-badge {
+      font-family: 'Press Start 2P', monospace; font-size: 0.48rem;
+      background: #dc2626; color: #fff;
+      padding: 4px 10px; letter-spacing: 1px;
+      display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 0 12px rgba(220,38,38,0.55);
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #fff;
+      animation: livePulse 1s ease infinite;
+    }
+    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.65)} }
+
+    /* Viewer / like stats */
+    .hud-stat {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.32rem, 0.85vw, 0.48rem);
+      color: rgba(255,255,255,0.6);
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
+    }
+    .stat-val { color: #a78bfa; display: inline-block; }
+    .stat-val.pop { animation: numPop 0.38s ease; }
+    @keyframes numPop { 0%,100%{transform:scale(1);color:#a78bfa} 50%{transform:scale(1.5);color:#fbbf24} }
+
+    /* Progress toward reward */
+    .reward-wrap {
+      flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .reward-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.28rem, 0.65vw, 0.4rem);
+      color: rgba(255,255,255,0.38); white-space: nowrap;
+    }
+    .reward-track {
+      flex: 1; max-width: 180px; height: 10px;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(139,92,246,0.28);
+    }
+    #progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #6d28d9, #a78bfa);
+      box-shadow: 0 0 8px rgba(167,139,250,0.6);
+      transition: width 0.55s ease;
+    }
+
+    /* ══════════════════════════════════════
+       MAIN LAYOUT  (chat | game-area)
+    ══════════════════════════════════════ */
+    #main {
+      flex: 1; display: flex; min-height: 0; overflow: hidden;
+    }
+
+    /* ── CHAT PANEL ── */
+    #chat-panel {
+      width: clamp(148px, 19%, 205px); flex-shrink: 0;
+      background: #0b0b20;
+      border-right: 2px solid rgba(139,92,246,0.18);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    #chat-header {
+      font-family: 'Press Start 2P', monospace; font-size: 0.42rem;
+      letter-spacing: 1px; color: #a78bfa;
+      padding: 9px 10px 7px;
+      border-bottom: 1px solid rgba(139,92,246,0.2);
+      background: #0d0d22; flex-shrink: 0;
+      display: flex; align-items: center; gap: 7px;
+    }
+    #chat-header .hd-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #ef4444; flex-shrink: 0;
+      animation: livePulse 1s ease infinite;
+    }
+
+    #chat-messages {
+      flex: 1; overflow: hidden;
+      padding: 6px 8px 6px;
+      display: flex; flex-direction: column;
+      justify-content: flex-end; gap: 3px;
+      mask-image: linear-gradient(to bottom, transparent 0%, black 22%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 22%);
+    }
+
+    .chat-msg {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.58rem, 1.15vw, 0.76rem);
+      line-height: 1.45; word-break: break-word;
+      padding: 3px 6px; border-radius: 3px;
+      animation: msgSlide 0.25s ease; flex-shrink: 0;
+    }
+    @keyframes msgSlide { from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:translateY(0)} }
+    .chat-msg .uname { font-weight: 900; margin-right: 3px; }
+    .chat-msg .mtxt  { color: rgba(255,255,255,0.78); }
+    .chat-msg.success {
+      background: rgba(139,92,246,0.09);
+      border-left: 2px solid #7c3aed;
+    }
+
+    /* ══════════════════════════════════════
+       GAME AREA (the room)
+    ══════════════════════════════════════ */
+    #game-area {
+      flex: 1; position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end;
+    }
+
+    /* Room background */
+    #room-bg {
+      position: absolute; inset: 0; z-index: 0;
+      background: linear-gradient(180deg,
+        #120e28 0%, #181232 45%, #1a1535 65%, #141028 100%);
+    }
+    #room-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 55% 40%, rgba(139,92,246,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 50% 70%, rgba(59,130,246,0.05) 0%, transparent 70%);
+    }
+
+    /* Monitor glow on wall */
+    .wall-glow {
+      position: absolute; z-index: 1; pointer-events: none;
+      width: 65%; height: 55%;
+      top: 15%; left: 50%; transform: translateX(-50%);
+      background: radial-gradient(ellipse, rgba(139,92,246,0.09) 0%, transparent 65%);
+    }
+
+    /* Shelf decoration top-right */
+    .room-shelf {
+      position: absolute; top: 7%; right: 5%; z-index: 2;
+      width: 86px; height: 12px;
+      background: #2a1f3e; border-bottom: 3px solid #1a1030;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+    }
+    .room-shelf::before {
+      content: '\uD83D\uDCDA\uD83D\uDCE6\uD83C\uDFA7';
+      position: absolute; bottom: 3px; left: 3px;
+      font-size: 0.9rem; line-height: 1; opacity: 0.55;
+    }
+
+    /* Poster on left wall */
+    .room-poster {
+      position: absolute; top: 8%; left: 4%; z-index: 2;
+      width: 60px; height: 72px;
+      background: #1e1538; border: 3px solid #2d2050;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 2px;
+      box-shadow: 0 0 14px rgba(139,92,246,0.12);
+    }
+    .room-poster-icon { font-size: 1.4rem; opacity: 0.65; }
+    .room-poster-txt {
+      font-family: 'Press Start 2P', monospace; font-size: 0.26rem;
+      color: rgba(167,139,250,0.5); letter-spacing: 1px;
+    }
+
+    /* ── CENTER SECTION (monitor + mic) ── */
+    #center-section {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0;
+      padding-bottom: 4px;
+    }
+
+    /* Monitor outer wrap */
+    .monitor-wrap {
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    .monitor-bezel {
+      background: #232340;
+      border: 5px solid #18183a;
+      box-shadow:
+        0 0 0 2px #2e2e55,
+        0 0 45px rgba(139,92,246,0.22),
+        0 8px 24px rgba(0,0,0,0.65);
+      padding: 10px;
+      border-radius: 6px;
+      width: clamp(280px, 46%, 420px);
+    }
+
+    .monitor-screen {
+      background: #010109;
+      border-radius: 3px;
+      aspect-ratio: 16 / 9.8;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 7px; position: relative; overflow: hidden;
+      box-shadow:
+        inset 0 0 60px rgba(139,92,246,0.11),
+        inset 0 0 120px rgba(59,130,246,0.05);
+    }
+    /* Scanlines */
+    .monitor-screen::before {
+      content: ''; position: absolute; inset: 0; z-index: 5;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.13) 2px, rgba(0,0,0,0.13) 4px
+      );
+      pointer-events: none;
+    }
+    /* Corner reflection */
+    .monitor-screen::after {
+      content: ''; position: absolute; top: 4%; left: 4%;
+      width: 24%; height: 18%; z-index: 6;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+      pointer-events: none;
+    }
+
+    /* Screen text content */
+    .scr-inner {
+      z-index: 10; position: relative;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 5px; padding: 10px; text-align: center;
+    }
+    .scr-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.24rem, 0.55vw, 0.35rem);
+      color: rgba(167,139,250,0.3); letter-spacing: 3px;
+    }
+    #word-display {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1.3rem, 3.8vw, 2.5rem);
+      color: #c4b5fd; letter-spacing: clamp(2px, 0.5vw, 5px);
+      line-height: 1.2;
+      text-shadow:
+        0 0 8px #8b5cf6,
+        0 0 22px #7c3aed,
+        0 0 44px rgba(124,58,237,0.4);
+      animation: wordGlow 3s ease-in-out infinite;
+    }
+    @keyframes wordGlow {
+      0%,100%{ text-shadow: 0 0 8px #8b5cf6, 0 0 22px #7c3aed; }
+      50%    { text-shadow: 0 0 14px #a78bfa, 0 0 38px #8b5cf6, 0 0 65px rgba(139,92,246,0.45); }
+    }
+    #word-translation {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.62rem, 1.3vw, 0.88rem);
+      font-weight: 700; color: rgba(196,181,253,0.4);
+    }
+
+    /* Monitor stand */
+    .mon-neck { width: 36px; height: 20px; background: #1c1c38; border-left: 3px solid #111; border-right: 3px solid #111; }
+    .mon-base { width: 110px; height: 9px; background: #1c1c38; border-radius: 3px; box-shadow: 0 2px 5px rgba(0,0,0,0.45); }
+
+    /* ── MIC SECTION ── */
+    #mic-section {
+      margin-top: 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .word-counter {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.26rem, 0.58vw, 0.38rem);
+      color: rgba(167,139,250,0.45);
+    }
+
+    #mic-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.38rem, 1vw, 0.58rem); letter-spacing: 1px;
+      background: #166534; color: #fff;
+      border: 4px solid #14532d;
+      box-shadow: 5px 5px 0 #052e16, inset -2px -2px 0 rgba(0,0,0,0.18);
+      padding: clamp(9px, 1.5vw, 13px) clamp(16px, 2.8vw, 24px);
+      cursor: pointer; transition: transform 0.1s;
+    }
+    #mic-btn:hover:not(:disabled) { transform: translateY(-2px); }
+    #mic-btn:active:not(:disabled) { transform: translate(3px,3px); box-shadow: 2px 2px 0 #052e16; }
+    #mic-btn:disabled {
+      background: #374151; border-color: #1f2937;
+      box-shadow: 3px 3px 0 #111; cursor: not-allowed;
+    }
+    #mic-btn.listening {
+      background: #991b1b; border-color: #7f1d1d;
+      box-shadow: 5px 5px 0 #450a0a, inset -2px -2px 0 rgba(0,0,0,0.2);
+      animation: micPulse 0.52s ease infinite;
+    }
+    @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+
+    #feedback {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.28rem, 0.72vw, 0.46rem);
+      min-height: 16px; text-align: center; letter-spacing: 1px;
+    }
+    #feedback.correct { color: #4ade80; }
+    #feedback.wrong   { color: #f87171; }
+
+    /* ══════════════════════════════════════
+       DESK ZONE
+    ══════════════════════════════════════ */
+    .desk-zone {
+      width: 100%; height: 28%; flex-shrink: 0;
+      position: relative; z-index: 5;
+      background: linear-gradient(180deg, #1a1030 0%, #120b24 50%, #0e0820 100%);
+    }
+
+    /* LED strip at desk top edge */
+    .desk-led {
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg,
+        rgba(109,40,217,0)   0%,
+        rgba(109,40,217,0.85) 15%,
+        rgba(59,130,246,0.9)  50%,
+        rgba(109,40,217,0.85) 85%,
+        rgba(109,40,217,0)   100%
+      );
+      filter: blur(0.6px);
+      box-shadow: 0 0 14px 3px rgba(139,92,246,0.55), 0 0 28px 5px rgba(59,130,246,0.22);
+      animation: ledBreath 5s ease-in-out infinite alternate;
+    }
+    @keyframes ledBreath {
+      from { opacity: 0.7; filter: blur(0.6px) hue-rotate(0deg); }
+      to   { opacity: 1;   filter: blur(1.2px) hue-rotate(18deg); }
+    }
+
+    /* Desk top surface line */
+    .desk-edge {
+      position: absolute; top: 3px; left: 0; right: 0; height: 2px;
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Desk items row */
+    .desk-items {
+      position: absolute;
+      top: 12px; left: 0; right: 0;
+      display: flex; align-items: flex-start;
+      padding: 0 18px; gap: 14px;
+    }
+
+    .di {  /* desk item */
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      flex-shrink: 0;
+    }
+    .di-icon {
+      font-size: clamp(1.3rem, 2.3vw, 1.85rem);
+      filter: brightness(0.7) saturate(0.6);
+      user-select: none;
+    }
+    .di-label {
+      font-family: 'Press Start 2P', monospace; font-size: 0.24rem;
+      color: rgba(255,255,255,0.18); letter-spacing: 1px;
+    }
+
+    /* Neko special: brighter (white porcelain) */
+    .di.neko .di-icon { filter: brightness(0.95) saturate(0.2); }
+
+    /* Spacer pushes neko & plant to right */
+    .di-spacer { flex: 1; }
+
+    /* ══════════════════════════════════════
+       PARTICLES
+    ══════════════════════════════════════ */
+    #particles {
+      position: absolute; inset: 0; z-index: 300; pointer-events: none;
+    }
+    .particle {
+      position: absolute; font-size: clamp(1rem, 1.8vw, 1.5rem);
+      pointer-events: none; user-select: none;
+      animation: pFloat 1.15s ease-out forwards;
+    }
+    @keyframes pFloat {
+      from { opacity: 1; transform: translate(0,0) scale(1); }
+      to   { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.35); }
+    }
+
+    /* ══════════════════════════════════════
+       OVERLAY SCREENS
+    ══════════════════════════════════════ */
+    .screen-overlay {
+      position: absolute; inset: 0; z-index: 800;
+      background: rgba(6,4,22,0.93);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; text-align: center; padding: 2rem;
+    }
+
+    .so-emoji { font-size: clamp(1.8rem, 5vw, 3rem); }
+
+    .so-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.65rem, 2.2vw, 1.2rem); line-height: 1.7;
+    }
+    #start-screen .so-title { color: #a78bfa; text-shadow: 0 0 22px rgba(167,139,250,0.5); }
+    #win-screen   .so-title { color: #4ade80; text-shadow: 0 0 22px rgba(74,222,128,0.5); }
+
+    .so-sub {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.72rem, 1.6vw, 1rem);
+      color: rgba(255,255,255,0.52); max-width: 400px; line-height: 1.75;
+    }
+    .so-stat {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.33rem, 0.8vw, 0.48rem);
+      color: rgba(255,255,255,0.7);
+    }
+
+    .so-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.4rem, 1vw, 0.58rem); letter-spacing: 1px;
+      padding: clamp(10px, 1.7vw, 14px) clamp(20px, 3.5vw, 28px);
+      border: 4px solid transparent; cursor: pointer;
+      box-shadow: 5px 5px 0 rgba(0,0,0,0.4); transition: all 0.14s;
+    }
+    .so-btn:hover { transform: translateY(-2px); }
+    .so-btn:active { transform: translate(3px,3px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
+
+    .so-btn.primary {
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      color: #fff; border-color: #4c1d95;
+    }
+    .so-btn.secondary {
+      background: rgba(255,255,255,0.05) !important;
+      color: rgba(255,255,255,0.42) !important;
+      border-color: rgba(255,255,255,0.1) !important;
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.2) !important;
+    }
+
+    /* Instructions grid */
+    .instr-row {
+      display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; max-width: 440px;
+    }
+    .instr-item {
+      font-family: 'Nunito', sans-serif;
+      background: rgba(139,92,246,0.07); border: 2px solid rgba(139,92,246,0.18);
+      border-radius: 6px; padding: 7px 12px;
+      font-size: clamp(0.58rem, 1.2vw, 0.78rem);
+      color: rgba(255,255,255,0.58); text-align: left;
+    }
+    .instr-item strong { display: block; color: #a78bfa; margin-bottom: 2px; font-size: 0.82em; }
+  </style>
+</head>
+<body>
+
+<a href="../../play.html" class="menu-btn">&#8592; Меню</a>
+
+<div id="game-shell">
+
+  <!-- ── HUD ── -->
+  <div id="hud">
+    <div class="live-badge">
+      <div class="live-dot"></div>LIVE
+    </div>
+    <div class="hud-stat">&#128101; <span id="hud-viewers" class="stat-val">147</span></div>
+    <div class="hud-stat">&#10084;&#65039; <span id="hud-likes" class="stat-val">389</span></div>
+    <div class="reward-wrap">
+      <span class="reward-label" id="progress-label">0 / 10</span>
+      <div class="reward-track"><div id="progress-fill"></div></div>
+      <span class="reward-label">&#127942;</span>
+    </div>
+  </div>
+
+  <!-- ── MAIN ── -->
+  <div id="main">
+
+    <!-- CHAT PANEL -->
+    <div id="chat-panel">
+      <div id="chat-header">
+        <div class="hd-dot"></div>LIVE CHAT
+      </div>
+      <div id="chat-messages"></div>
+    </div>
+
+    <!-- GAME AREA (the room) -->
+    <div id="game-area">
+
+      <!-- Background layers -->
+      <div id="room-bg"></div>
+      <div class="wall-glow"></div>
+      <div class="room-shelf"></div>
+      <div class="room-poster">
+        <div class="room-poster-icon">&#127918;</div>
+        <div class="room-poster-txt">GAMING</div>
+      </div>
+
+      <!-- Center interactive section -->
+      <div id="center-section">
+
+        <!-- Monitor -->
+        <div class="monitor-wrap">
+          <div class="monitor-bezel">
+            <div class="monitor-screen">
+              <div class="scr-inner">
+                <div class="scr-label">&#9654; SAY THE WORD</div>
+                <div id="word-display">&#8212;</div>
+                <div id="word-translation"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mon-neck"></div>
+          <div class="mon-base"></div>
+        </div>
+
+        <!-- Mic button -->
+        <div id="mic-section">
+          <div class="word-counter" id="word-counter"></div>
+          <button id="mic-btn" disabled>&#127908; SAY IT!</button>
+          <div id="feedback"></div>
+        </div>
+
+      </div><!-- /center-section -->
+
+      <!-- Desk zone -->
+      <div class="desk-zone">
+        <div class="desk-led"></div>
+        <div class="desk-edge"></div>
+        <div class="desk-items">
+          <div class="di">
+            <div class="di-icon">&#9000;&#65039;</div>
+          </div>
+          <div class="di">
+            <div class="di-icon">&#128433;&#65039;</div>
+          </div>
+          <div class="di-spacer"></div>
+          <div class="di neko">
+            <div class="di-icon">&#128049;</div>
+            <div class="di-label">NEKO</div>
+          </div>
+          <div class="di">
+            <div class="di-icon">&#129716;</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Particles -->
+      <div id="particles"></div>
+
+      <!-- START SCREEN -->
+      <div class="screen-overlay" id="start-screen">
+        <div class="so-emoji">&#128250;&#10024;</div>
+        <div class="so-title">STREAM ROOM</div>
+        <div class="so-sub">You are a streamer! Say English words and watch the chat go wild!</div>
+        <div class="instr-row">
+          <div class="instr-item"><strong>1. &#1057;&#1084;&#1086;&#1090;&#1088;&#1080; &#128064;</strong>&#1057;&#1083;&#1086;&#1074;&#1086; &#1085;&#1072; &#1084;&#1086;&#1085;&#1080;&#1090;&#1086;&#1088;&#1077;</div>
+          <div class="instr-item"><strong>2. &#1053;&#1072;&#1078;&#1084;&#1080; &#127908;</strong>&#1047;&#1077;&#1083;&#1105;&#1085;&#1091;&#1102; &#1082;&#1085;&#1086;&#1087;&#1082;&#1091;</div>
+          <div class="instr-item"><strong>3. &#1043;&#1086;&#1074;&#1086;&#1088;&#1080; &#128483;</strong>&#1057;&#1083;&#1086;&#1074;&#1086; &#1087;&#1086;-&#1072;&#1085;&#1075;&#1083;&#1080;&#1081;&#1089;&#1082;&#1080;</div>
+          <div class="instr-item"><strong>4. &#1063;&#1072;&#1090; &#128172;</strong>&#1056;&#1072;&#1076;&#1091;&#1077;&#1090;&#1089;&#1103; &#1080; &#1083;&#1072;&#1081;&#1082;&#1072;&#1077;&#1090;!</div>
+        </div>
+        <button class="so-btn primary" id="start-btn">&#9654; START STREAM!</button>
+        <a href="../../play.html" class="so-btn secondary">&#8592; &#1052;&#1077;&#1085;&#1102;</a>
+      </div>
+
+      <!-- WIN SCREEN -->
+      <div class="screen-overlay" id="win-screen" style="display:none">
+        <div class="so-emoji">&#127942;&#128156;</div>
+        <div class="so-title">STREAM<br>COMPLETE!</div>
+        <div class="so-sub">All words done! The viewers loved it!</div>
+        <div class="so-stat" id="win-stat"></div>
+        <button class="so-btn primary" id="restart-btn">&#9654; STREAM AGAIN!</button>
+        <a href="../../play.html" class="so-btn secondary">&#8592; &#1052;&#1077;&#1085;&#1102;</a>
+      </div>
+
+    </div><!-- /game-area -->
+  </div><!-- /main -->
+</div><!-- /game-shell -->
+
+<script src="../shared/wordlists.js"></script>
+<script src="../shared/utils.js"></script>
+<script>
+/* ────────────────────────────────────────────────────────
+   WORD LIST
+──────────────────────────────────────────────────────── */
+const BUILT_IN_WORDS = [
+  { word: 'cat',    ru: 'кошка' },
+  { word: 'dog',    ru: 'собака' },
+  { word: 'sun',    ru: 'солнце' },
+  { word: 'tree',   ru: 'дерево' },
+  { word: 'house',  ru: 'дом' },
+  { word: 'ball',   ru: 'мяч' },
+  { word: 'book',   ru: 'книга' },
+  { word: 'star',   ru: 'звезда' },
+  { word: 'bird',   ru: 'птица' },
+  { word: 'fish',   ru: 'рыба' },
+  { word: 'frog',   ru: 'лягушка' },
+  { word: 'apple',  ru: 'яблоко' },
+  { word: 'flower', ru: 'цветок' },
+  { word: 'cake',   ru: 'торт' },
+  { word: 'moon',   ru: 'луна' },
+  { word: 'rain',   ru: 'дождь' },
+  { word: 'fox',    ru: 'лиса' },
+  { word: 'bear',   ru: 'медведь' },
+  { word: 'duck',   ru: 'утка' },
+  { word: 'bus',    ru: 'автобус' },
+  { word: 'cup',    ru: 'чашка' },
+  { word: 'milk',   ru: 'молоко' },
+  { word: 'hat',    ru: 'шляпа' },
+  { word: 'drum',   ru: 'барабан' },
+  { word: 'wolf',   ru: 'волк' },
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildGameWords() {
+  const extra = [];
+  if (typeof VG_TOPICS !== 'undefined') {
+    for (const key of Object.keys(VG_TOPICS)) {
+      const t = VG_TOPICS[key];
+      if (t.words) {
+        for (const cat of Object.values(t.words)) {
+          if (Array.isArray(cat)) {
+            cat.forEach(w => {
+              if (w && w.word && w.word.length <= 9 && !w.word.includes(' '))
+                extra.push(w);
+            });
+          }
+        }
+      }
+    }
+  }
+  return shuffleArray([...BUILT_IN_WORDS, ...extra]).slice(0, 30);
+}
+
+/* ────────────────────────────────────────────────────────
+   CHAT DATA
+──────────────────────────────────────────────────────── */
+const CHATTERS = [
+  { name: 'PixelFox33',  color: '#fbbf24' },
+  { name: 'StreamFan01', color: '#60a5fa' },
+  { name: 'NeonCat42',   color: '#c084fc' },
+  { name: 'GamingPanda', color: '#34d399' },
+  { name: 'StarByte22',  color: '#22d3ee' },
+  { name: 'CheerBot',    color: '#facc15' },
+  { name: 'HypeQueen',   color: '#fb7185' },
+  { name: 'NightOwl88',  color: '#f472b6' },
+  { name: 'CoolKid99',   color: '#4ade80' },
+  { name: 'Pro_Viewer',  color: '#a78bfa' },
+];
+
+const AMBIENT_TEXTS = [
+  '\uD83D\uDC40', '!lurk', 'Pog \uD83C\uDFAE', 'nice stream!', 'hi!',
+  '\uD83D\uDE0A', 'good luck!', '\u2728', 'Poggers!', '\uD83D\uDCAA',
+  'cool!', 'lol \uD83D\uDE04', '\uD83C\uDF1F', 'heyyy \uD83C\uDF89',
+];
+
+const SUCCESS_TEXTS = [
+  'Great! \u2B50\u2B50\u2B50',
+  'AWESOME! \uD83D\uDD25',
+  '\u041C\u043E\u043B\u043E\u0434\u0435\u0446! \uD83D\uDCAA',
+  "Let's GO! \uD83D\uDE80",
+  'EZ Clap \uD83D\uDC4F',
+  'Amazing! \u2728',
+  'Perfect! \uD83D\uDCAF',
+  'WOW! \uD83D\uDE31',
+  'So good! \uD83C\uDF89',
+  'POGGERS! \uD83C\uDF8A',
+  'Incredible! \uD83C\uDF1F',
+  '\uD83D\uDD25\uD83D\uDD25\uD83D\uDD25',
+];
+
+const ERROR_TEXTS = [
+  'Almost! \uD83D\uDCAA',
+  'You got this! \u2764\uFE0F',
+  'Try again! \uD83C\uDF1F',
+  'peepoComfy believe!',
+  'Keep going! \uD83D\uDCAB',
+];
+
+/* ────────────────────────────────────────────────────────
+   SPEECH API
+──────────────────────────────────────────────────────── */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _rec = null, _vcb = null;
+
+function validateVoiceCommand(wordObj, cb) { startListening(wordObj, cb); }
+
+function startListening(wordObj, cb) {
+  _vcb = cb;
+  if (!SR) {
+    console.warn('StreamRoom: SpeechRecognition not supported — click mic again for mock success.');
+    return;
+  }
+  if (_rec) { try { _rec.abort(); } catch(e) {} }
+  const r = new SR();
+  _rec = r;
+  r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
+  r.onresult = ev => {
+    if (!_vcb) return;
+    const target = wordObj.word.toLowerCase();
+    const alts = Array.from({ length: ev.results[0].length }, (_, i) =>
+      ev.results[0][i].transcript.toLowerCase().trim());
+    const matched = alts.some(a => a === target || a.startsWith(target) || a.includes(target));
+    const done = _vcb; _vcb = null; _rec = null;
+    done(matched);
+  };
+  r.onerror = e => { if (e.error === 'aborted') return; if (_vcb && e.error === 'no-speech') try { r.start(); } catch(e2) {} };
+  r.onend   = () => { if (_vcb && _rec === r) try { r.start(); } catch(e) {} };
+  try { r.start(); } catch(e) { console.warn('StreamRoom: recognition start failed', e); }
+}
+
+function stopListening() {
+  _vcb = null;
+  if (_rec) { try { _rec.abort(); } catch(e) {} _rec = null; }
+}
+
+/* ────────────────────────────────────────────────────────
+   GAME STATE
+──────────────────────────────────────────────────────── */
+const WORDS_TO_WIN = 10;
+
+let running      = false;
+let viewers      = 147;
+let likes        = 389;
+let wordsCorrect = 0;
+let wordIdx      = 0;
+let GAME_WORDS   = [];
+let listening    = false;
+let awaitingNext = false;
+let ambientTO    = null;
+
+/* ────────────────────────────────────────────────────────
+   HELPERS
+──────────────────────────────────────────────────────── */
+function randFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function fmtNum(n) {
+  if (n >= 10000) return (n / 1000).toFixed(0) + 'K';
+  if (n >= 1000)  return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
+
+/* ────────────────────────────────────────────────────────
+   CHAT MANAGEMENT
+──────────────────────────────────────────────────────── */
+function addChatMsg(chatter, text, isSuccess = false) {
+  const wrap = document.getElementById('chat-messages');
+  const el   = document.createElement('div');
+  el.className = 'chat-msg' + (isSuccess ? ' success' : '');
+  el.innerHTML =
+    `<span class="uname" style="color:${chatter.color}">${chatter.name}:</span>` +
+    `<span class="mtxt"> ${text}</span>`;
+  wrap.appendChild(el);
+  while (wrap.children.length > 20) wrap.removeChild(wrap.firstChild);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function addAmbientMsg() {
+  if (!running) return;
+  addChatMsg(randFrom(CHATTERS), randFrom(AMBIENT_TEXTS));
+  ambientTO = setTimeout(addAmbientMsg, 2200 + Math.random() * 3500);
+}
+
+function burstSuccessMsgs() {
+  const n = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    setTimeout(() => {
+      if (running || wordsCorrect >= WORDS_TO_WIN)
+        addChatMsg(randFrom(CHATTERS), randFrom(SUCCESS_TEXTS), true);
+    }, i * 190);
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   PARTICLES
+──────────────────────────────────────────────────────── */
+const SYMS = ['\u2764\uFE0F','\u2B50','\u2728','\uD83D\uDC9C','\uD83D\uDC99','\uD83C\uDF1F','\uD83D\uDCAB','\uD83C\uDF89','\uD83D\uDC96','\uD83D\uDD25'];
+
+function spawnParticles(n = 12) {
+  const cont   = document.getElementById('particles');
+  const micBtn = document.getElementById('mic-btn');
+  const ga     = document.getElementById('game-area');
+  const mr = micBtn.getBoundingClientRect();
+  const gr = ga.getBoundingClientRect();
+  const cx = mr.left - gr.left + mr.width  / 2;
+  const cy = mr.top  - gr.top  + mr.height / 2;
+
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('div');
+    p.className   = 'particle';
+    p.textContent = randFrom(SYMS);
+    const dx = (Math.random() - 0.5) * 220;
+    const dy = -(65 + Math.random() * 115);
+    p.style.cssText = `left:${cx}px;top:${cy}px;--dx:${dx}px;--dy:${dy}px;animation-delay:${Math.random()*0.22}s;`;
+    cont.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   HUD UPDATE
+──────────────────────────────────────────────────────── */
+function popStat(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  setTimeout(() => el.classList.remove('pop'), 380);
+}
+
+function updateHUD() {
+  document.getElementById('hud-viewers').textContent = fmtNum(viewers);
+  document.getElementById('hud-likes').textContent   = fmtNum(likes);
+  const pct = Math.min(100, (wordsCorrect / WORDS_TO_WIN) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${wordsCorrect} / ${WORDS_TO_WIN}`;
+}
+
+/* ────────────────────────────────────────────────────────
+   WORD DISPLAY
+──────────────────────────────────────────────────────── */
+function showWord(w) {
+  document.getElementById('word-display').textContent     = w.word.toUpperCase();
+  document.getElementById('word-translation').textContent = w.ru;
+  document.getElementById('word-counter').textContent     =
+    `Word ${wordsCorrect + 1} of ${WORDS_TO_WIN}`;
+  setMicState('idle');
+  showFeedback('', '');
+  listening = false; awaitingNext = false;
+}
+
+function showFeedback(text, cls) {
+  const el = document.getElementById('feedback');
+  el.textContent = text; el.className = cls;
+}
+
+function setMicState(state) {
+  const btn = document.getElementById('mic-btn');
+  if (state === 'idle') {
+    btn.disabled = false; btn.className = '';
+    btn.innerHTML = '\uD83C\uDF99 SAY IT!';
+  } else if (state === 'listening') {
+    btn.disabled = false; btn.className = 'listening';
+    btn.innerHTML = '\uD83D\uDD34 LISTENING...';
+  } else {
+    btn.disabled = true; btn.className = '';
+    btn.innerHTML = '\u23F3...';
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   MIC CLICK
+──────────────────────────────────────────────────────── */
+function onMicClick() {
+  if (!running || awaitingNext) return;
+  // Mock bypass: click again while listening = instant success
+  if (listening) { stopListening(); onResult(true); return; }
+
+  listening = true;
+  setMicState('listening');
+  showFeedback('', '');
+  validateVoiceCommand(GAME_WORDS[wordIdx], onResult);
+}
+
+/* ────────────────────────────────────────────────────────
+   VOICE RESULT
+──────────────────────────────────────────────────────── */
+function onResult(matched) {
+  listening = false; awaitingNext = true;
+  setMicState('locked');
+
+  if (matched) {
+    const praise = ['Great! \u2B50', 'Awesome! \u2728', 'Nice! \uD83C\uDF1F', 'Perfect! \uD83D\uDCAF'];
+    showFeedback(randFrom(praise), 'correct');
+
+    wordsCorrect++;
+    viewers += 8  + Math.floor(Math.random() * 22);
+    likes   += 12 + Math.floor(Math.random() * 32);
+
+    popStat('hud-viewers');
+    setTimeout(() => popStat('hud-likes'), 110);
+    updateHUD();
+
+    burstSuccessMsgs();
+    spawnParticles(14);
+
+    // Milestone chat shouts
+    if (wordsCorrect === Math.floor(WORDS_TO_WIN / 3)) {
+      setTimeout(() => addChatMsg(randFrom(CHATTERS), '\uD83D\uDD25 Warming up! You\'re on fire!', true), 700);
+    } else if (wordsCorrect === Math.floor(WORDS_TO_WIN * 2 / 3)) {
+      setTimeout(() => addChatMsg(randFrom(CHATTERS), '\uD83D\uDCC8 Trending! Almost to the goal!', true), 700);
+    }
+
+    if (wordsCorrect >= WORDS_TO_WIN) {
+      setTimeout(endGame, 1400);
+    } else {
+      setTimeout(() => {
+        wordIdx = (wordIdx + 1) % GAME_WORDS.length;
+        showWord(GAME_WORDS[wordIdx]);
+      }, 1400);
+    }
+
+  } else {
+    showFeedback('Almost! Try again! \uD83D\uDCAA', 'wrong');
+    setTimeout(() => addChatMsg(randFrom(CHATTERS), randFrom(ERROR_TEXTS)), 150);
+    setTimeout(() => {
+      setMicState('idle');
+      showFeedback('', '');
+      awaitingNext = false;
+    }, 1350);
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   SCREENS
+──────────────────────────────────────────────────────── */
+function showScreen(id) {
+  ['start-screen', 'win-screen'].forEach(sid => {
+    document.getElementById(sid).style.display = sid === id ? 'flex' : 'none';
+  });
+}
+
+/* ────────────────────────────────────────────────────────
+   GAME INIT / START / END
+──────────────────────────────────────────────────────── */
+function initGame() {
+  GAME_WORDS   = shuffleArray(buildGameWords());
+  wordIdx      = 0;
+  wordsCorrect = 0;
+  viewers      = 120 + Math.floor(Math.random() * 120);
+  likes        = 280 + Math.floor(Math.random() * 250);
+  listening    = false;
+  awaitingNext = false;
+  stopListening();
+  if (ambientTO) clearTimeout(ambientTO);
+  document.getElementById('chat-messages').innerHTML = '';
+  updateHUD();
+}
+
+function startGame() {
+  initGame();
+  showScreen(null);
+  showWord(GAME_WORDS[0]);
+  running = true;
+
+  // Seed chat with welcome messages
+  addChatMsg(randFrom(CHATTERS), '\uD83C\uDF89 Stream started!', true);
+  setTimeout(() => addChatMsg(randFrom(CHATTERS), 'Letss go! \uD83D\uDE80'), 700);
+  setTimeout(() => addChatMsg(randFrom(CHATTERS), 'Good luck! \uD83C\uDF1F'), 1400);
+
+  // Start ambient chat loop
+  ambientTO = setTimeout(addAmbientMsg, 2500 + Math.random() * 2000);
+}
+
+function endGame() {
+  running = false;
+  stopListening();
+  if (ambientTO) clearTimeout(ambientTO);
+  listening = false;
+
+  // Big celebration burst in chat
+  [
+    '\uD83C\uDFC6 STREAM COMPLETE!',
+    '\uD83C\uDF8A All words done! Amazing!',
+    '\uD83D\uDCAF You\'re a pro streamer!',
+    '\uD83D\uDC4F\uD83D\uDC4F\uD83D\uDC4F',
+    '\uD83C\uDF1F What a performance!',
+  ].forEach((msg, i) => {
+    setTimeout(() => addChatMsg(randFrom(CHATTERS), msg, true), i * 240);
+  });
+
+  spawnParticles(26);
+  if (typeof VG !== 'undefined') VG.saveScore('stream-room', wordsCorrect * 10);
+
+  setTimeout(() => {
+    document.getElementById('win-stat').textContent =
+      '\u0417\u0440\u0438\u0442\u0435\u043B\u0438: ' + fmtNum(viewers) +
+      '  \u2022  \u041B\u0430\u0439\u043A\u0438: ' + fmtNum(likes);
+    showScreen('win-screen');
+  }, 1900);
+}
+
+/* ────────────────────────────────────────────────────────
+   EVENTS + BOOTSTRAP
+──────────────────────────────────────────────────────── */
+document.getElementById('mic-btn').addEventListener('click', onMicClick);
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+initGame();
+</script>
+</body>
+</html>

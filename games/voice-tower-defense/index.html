@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voice Tower Defense — VoiceGames</title>
+  <meta name="description" content="A voice-controlled tower defense game. Click a tower, say the phrase, and fire a devastating laser to defend your base!">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #04040c;
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── BACK BUTTON ── */
+    .menu-btn {
+      position: fixed; top: 12px; left: 12px; z-index: 900;
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(5,5,20,0.95);
+      border: 1px solid rgba(0,180,255,0.3);
+      color: #66ccff; padding: 7px 15px; border-radius: 50px;
+      font-size: 0.78em; font-weight: 700; text-decoration: none;
+      transition: all .2s; backdrop-filter: blur(12px);
+    }
+    .menu-btn:hover { border-color: #00aaff; box-shadow: 0 0 14px rgba(0,150,255,0.3); }
+
+    /* ── HUD ── */
+    #hud {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 20px 7px 60px;
+      background: rgba(4,4,18,0.98);
+      border-bottom: 1px solid rgba(0,120,220,0.22);
+      flex-shrink: 0; gap: 20px; z-index: 100;
+    }
+    .hud-block { display: flex; align-items: center; gap: 10px; }
+    .hud-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.5rem; color: rgba(0,180,255,0.55); letter-spacing: 2px;
+    }
+    .hud-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem; font-weight: 900; color: #44ddff;
+    }
+    .base-hp-wrap {
+      width: 130px; height: 9px;
+      background: rgba(0,0,0,0.6); border-radius: 5px; overflow: hidden;
+      border: 1px solid rgba(0,120,200,0.25);
+    }
+    #base-hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00cc66, #44ff88);
+      border-radius: 5px;
+      transition: width 0.4s ease, background 0.3s;
+      box-shadow: 0 0 8px rgba(68,255,136,0.4);
+      width: 100%;
+    }
+    #hud-timer {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem; font-weight: 900; color: #fff; min-width: 44px;
+    }
+    #hud-timer.warning { color: #ff4444; animation: timerBlink 0.5s ease infinite; }
+    @keyframes timerBlink { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+    /* ── LISTENING BADGE ── */
+    #listening-badge {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      display: none; align-items: center; gap: 8px;
+      background: rgba(255,170,0,0.1);
+      border: 1px solid rgba(255,170,0,0.5);
+      border-radius: 50px; padding: 8px 20px;
+      font-size: 0.78rem; font-weight: 700; color: #ffcc44;
+      white-space: nowrap; z-index: 500;
+      box-shadow: 0 0 20px rgba(255,170,0,0.18);
+    }
+    #listening-badge.active { display: flex; }
+    .mic-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ffcc44; animation: micPulse 0.7s ease infinite;
+    }
+    @keyframes micPulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.8);opacity:0.4} }
+
+    /* ── CANVAS CONTAINER ── */
+    #game-wrap { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* ── OVERLAY SCREENS ── */
+    .screen-overlay {
+      position: absolute; inset: 0;
+      background: rgba(4,4,18,0.94);
+      backdrop-filter: blur(10px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 800; gap: 16px;
+      text-align: center; padding: 2rem;
+    }
+    .so-emoji { font-size: 3.2rem; }
+    .so-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.4rem; font-weight: 900; line-height: 1.5;
+    }
+    #start-screen .so-title { color: #44ddff; text-shadow: 0 0 22px rgba(68,200,255,0.65); }
+    #win-screen .so-title   { color: #44ff88; text-shadow: 0 0 22px rgba(68,255,136,0.65); }
+    #lose-screen .so-title  { color: #ff4466; text-shadow: 0 0 22px rgba(255,68,100,0.65); }
+    .so-sub  { font-size: 0.82rem; color: rgba(255,255,255,0.5); max-width: 340px; line-height: 1.7; }
+    .so-stat { font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.8); }
+    .so-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem; font-weight: 900; letter-spacing: 2px;
+      padding: 12px 26px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .so-btn:hover { transform: scale(1.05); }
+    #start-screen .so-btn { background: linear-gradient(135deg,#003388,#0066ff); color:#fff; box-shadow:0 0 24px rgba(0,100,255,0.4); }
+    #win-screen .so-btn   { background: linear-gradient(135deg,#006633,#00ff88); color:#002211; box-shadow:0 0 24px rgba(0,255,136,0.4); }
+    #lose-screen .so-btn  { background: linear-gradient(135deg,#880011,#cc0033); color:#fff; box-shadow:0 0 24px rgba(200,0,50,0.4); }
+    .so-btn.secondary { background: rgba(255,255,255,0.06) !important; color: rgba(255,255,255,0.45) !important; border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: none !important; }
+
+    .instructions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
+    .instr-item {
+      background: rgba(0,60,140,0.18); border: 1px solid rgba(0,120,200,0.18);
+      border-radius: 8px; padding: 10px 14px; font-size: 0.72rem;
+      color: rgba(255,255,255,0.65); flex: 1; min-width: 88px;
+    }
+    .instr-item strong { display: block; margin-bottom: 3px; color: #44ddff; }
+  </style>
+</head>
+<body>
+
+<a href="../../play.html" class="menu-btn">← Menu</a>
+
+<div id="listening-badge">
+  <div class="mic-dot"></div>
+  <span>Listening — say the phrase!</span>
+</div>
+
+<!-- ── HUD ── -->
+<div id="hud">
+  <div class="hud-block">
+    <span class="hud-label">WAVE</span>
+    <span class="hud-value" id="hud-wave">1</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">BASE&nbsp;HP</span>
+    <div class="base-hp-wrap"><div id="base-hp-fill"></div></div>
+    <span class="hud-value" id="hud-basehp">100</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">SCORE</span>
+    <span class="hud-value" id="hud-score">0</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">TIME</span>
+    <span id="hud-timer">2:00</span>
+  </div>
+</div>
+
+<!-- ── GAME CANVAS ── -->
+<div id="game-wrap">
+  <canvas id="canvas"></canvas>
+
+  <!-- Start -->
+  <div class="screen-overlay" id="start-screen">
+    <div class="so-emoji">🔫🛡️</div>
+    <div class="so-title">VOICE TOWER<br>DEFENSE</div>
+    <div class="so-sub">Click a tower, then say the phrase aloud to fire a devastating laser down the lane! Defend your base for 2 minutes to win.</div>
+    <div class="instructions">
+      <div class="instr-item"><strong>🟢 Ready</strong>Click to select</div>
+      <div class="instr-item"><strong>🟡 Listening</strong>Say the phrase</div>
+      <div class="instr-item"><strong>🔴 Cooldown</strong>Recharging…</div>
+    </div>
+    <button class="so-btn" id="start-btn">▶ START MISSION</button>
+    <a href="../../play.html" class="so-btn secondary">← Menu</a>
+  </div>
+
+  <!-- Win -->
+  <div class="screen-overlay" id="win-screen" style="display:none">
+    <div class="so-emoji">🏆✨</div>
+    <div class="so-title">MISSION<br>COMPLETE!</div>
+    <div class="so-sub">You defended the base and survived the full assault!</div>
+    <div class="so-stat" id="win-stat"></div>
+    <button class="so-btn" id="restart-win">▶ PLAY AGAIN</button>
+    <a href="../../play.html" class="so-btn secondary">← Menu</a>
+  </div>
+
+  <!-- Lose -->
+  <div class="screen-overlay" id="lose-screen" style="display:none">
+    <div class="so-emoji">💀🚨</div>
+    <div class="so-title">BASE<br>DESTROYED</div>
+    <div class="so-sub">The enemies broke through your defenses. Train harder, Commander!</div>
+    <div class="so-stat" id="lose-stat"></div>
+    <button class="so-btn" id="restart-lose">▶ TRY AGAIN</button>
+    <a href="../../play.html" class="so-btn secondary">← Menu</a>
+  </div>
+</div>
+
+<script src="../shared/wordlists.js"></script>
+<script src="../shared/utils.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   WORD LIST — pull from shared VG_TOPICS, fallback to built-in
+════════════════════════════════════════════════════════════════ */
+const BUILT_IN = [
+  { text: 'cast the spell',      alts: ['cast the spell','cast a spell','cast spell'] },
+  { text: 'fire ball strike',    alts: ['fire ball strike','fireball strike','fire ball'] },
+  { text: 'ice wall rise',       alts: ['ice wall rise','ice wall'] },
+  { text: 'thunder strike now',  alts: ['thunder strike now','thunder strike'] },
+  { text: 'freeze the enemy',    alts: ['freeze the enemy','freeze enemy'] },
+  { text: 'summon the dragon',   alts: ['summon the dragon','summon dragon'] },
+  { text: 'the lion roars',      alts: ['the lion roars','lion roars'] },
+  { text: 'a bird can fly',      alts: ['a bird can fly','bird can fly','birds can fly'] },
+  { text: 'the dog runs fast',   alts: ['the dog runs fast','dog runs fast'] },
+  { text: 'open the gate',       alts: ['open the gate','open gate'] },
+  { text: 'shield of light',     alts: ['shield of light','light shield'] },
+  { text: 'heal my wounds',      alts: ['heal my wounds','heal wounds'] },
+  { text: 'the cat sleeps',      alts: ['the cat sleeps','cat sleeps'] },
+  { text: 'magic is real',       alts: ['magic is real','magic real'] },
+];
+
+function buildPhraseList() {
+  const list = [];
+  if (typeof VG_TOPICS !== 'undefined') {
+    for (const key of Object.keys(VG_TOPICS)) {
+      const topic = VG_TOPICS[key];
+      if (Array.isArray(topic.sentences)) list.push(...topic.sentences);
+    }
+  }
+  return list.length >= 5 ? list : BUILT_IN;
+}
+
+let PHRASES = [];
+const randPhrase = () => PHRASES[Math.floor(Math.random() * PHRASES.length)];
+
+/* ════════════════════════════════════════════════════════════════
+   SPRITES
+════════════════════════════════════════════════════════════════ */
+const sprites = {
+  grunt: new Image(),
+  runner: new Image(),
+  tank: new Image()
+};
+sprites.grunt.src  = 'assets/Icon30.png';
+sprites.runner.src = 'assets/Icon33.png';
+sprites.tank.src   = 'assets/Icon38.png';
+
+/* ════════════════════════════════════════════════════════════════
+   WEB SPEECH API
+════════════════════════════════════════════════════════════════ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _rec = null, _vcb = null;
+
+function validateVoiceCommand(phraseObj, callback) {
+  startListening(phraseObj, callback);
+}
+
+function startListening(phraseObj, cb) {
+  _vcb = cb;
+  document.getElementById('listening-badge').classList.add('active');
+  if (!SR) {
+    console.warn('VoiceTD: SpeechRecognition is not supported. Click the tower again to trigger mock fire.');
+    return;
+  }
+  if (_rec) { try { _rec.abort(); } catch(e) {} }
+
+  const r = new SR();
+  _rec = r;
+  r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
+
+  r.onresult = ev => {
+    if (!_vcb) return;
+    const alts = Array.from({length: ev.results[0].length}, (_, i) =>
+      ev.results[0][i].transcript.toLowerCase().trim());
+    const matched = typeof phraseMatches === 'function'
+      ? phraseMatches(alts, phraseObj)
+      : alts.some(a => (phraseObj.alts || [phraseObj.text]).some(ref => a.includes(ref.toLowerCase())));
+    const done = _vcb; _vcb = null; _rec = null;
+    done(matched);
+  };
+  r.onerror = e => { if (e.error === 'aborted') return; if (_vcb && e.error === 'no-speech') try { r.start(); } catch(e2){} };
+  r.onend = () => { if (_vcb && _rec === r) try { r.start(); } catch(e){} };
+  try { r.start(); } catch(e) { console.warn('VoiceTD: recognition start failed', e); }
+}
+
+function stopListening() {
+  _vcb = null;
+  if (_rec) { try { _rec.abort(); } catch(e) {} _rec = null; }
+  document.getElementById('listening-badge').classList.remove('active');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════════════════════════════ */
+const GAME_W      = 920;
+const GAME_H      = 510;
+const LANE_N      = 3;
+const LANE_H      = GAME_H / LANE_N;            // 170
+const LANE_CY     = [LANE_H * .5, LANE_H * 1.5, LANE_H * 2.5]; // [85, 255, 425]
+
+const BASE_W      = 68;
+const BASE_HP_MAX = 100;
+
+const TOWER_X     = 136;
+const TOWER_R     = 22;   // draw radius
+const TOWER_HIT   = 32;   // click hitbox radius
+const COOLDOWN_MS = 7000;
+const LISTEN_MS   = 6000;
+const WIN_SECS    = 120;
+const DMG_PER_HIT = 10;   // base damage per enemy reaching base
+
+const ETYPES = {
+  grunt:  { hp: 30,  speed: 54, sz: 14, col: '#44cc55', glow: '#22aa33', pts: 10 },
+  runner: { hp: 20,  speed: 98, sz: 10, col: '#ffcc00', glow: '#cc9900', pts: 15 },
+  tank:   { hp: 120, speed: 28, sz: 20, col: '#cc4444', glow: '#aa2222', pts: 30 },
+};
+
+/* ════════════════════════════════════════════════════════════════
+   GAME STATE
+════════════════════════════════════════════════════════════════ */
+let running = false;
+let baseHP  = BASE_HP_MAX;
+let score   = 0;
+let wave    = 1;
+let timeLeft  = WIN_SECS;
+let waveTimer = 0;
+let enemies   = [];
+let lasers    = [];
+let particles = [];
+let towers    = [];
+let spawnTs   = [800, 1400, 2000];
+let eidNext   = 0;
+let baseFlash = 0;
+let killCount = 0;
+
+/* ════════════════════════════════════════════════════════════════
+   CANVAS
+════════════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+canvas.width  = GAME_W;
+canvas.height = GAME_H;
+
+function csCoords(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (GAME_W / r.width),
+    y: (e.clientY - r.top)  * (GAME_H / r.height),
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ENEMY CLASS
+════════════════════════════════════════════════════════════════ */
+class Enemy {
+  constructor(type, lane) {
+    const c   = ETYPES[type];
+    this.id   = eidNext++;
+    this.type = type;
+    this.lane = lane;
+    this.x    = GAME_W + c.sz + 10;
+    this.y    = LANE_CY[lane];
+    this.hp   = this.maxHp = c.hp;
+    this.speed= c.speed;
+    this.sz   = c.sz;
+    this.col  = c.col;
+    this.glow = c.glow;
+    this.pts  = c.pts;
+    this.dead = false;
+    this.wp   = Math.random() * Math.PI * 2; // wobble phase
+  }
+
+  update(dt) {
+    this.x -= this.speed * dt;
+    this.wp += dt * 4.5;
+  }
+
+  draw() {
+    const {x, y, sz, glow, hp, maxHp, type, wp} = this;
+    const wy = Math.sin(wp) * 1.6;
+
+    ctx.save();
+    
+    // Aura/glow effect around the image
+    ctx.shadowColor = glow;
+    ctx.shadowBlur  = 12;
+
+    // Draw the preloaded image centered on enemy coordinates
+    const img = sprites[type];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      ctx.drawImage(img, x - sz, y - sz + wy, sz * 2, sz * 2);
+    } else {
+      // Fallback in case image is loading or failed: draw a neon circle
+      ctx.fillStyle = this.col;
+      ctx.beginPath();
+      ctx.arc(x, y + wy, sz, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    ctx.shadowBlur = 0;
+
+    // HP bar (if damaged)
+    if (hp < maxHp) {
+      const bw = sz * 2 + 4, bx = x - sz - 2, by = y - sz - 12 + wy;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(bx-1, by-1, bw+2, 7);
+      const pct = hp / maxHp;
+      ctx.fillStyle = pct > .5 ? '#44ff88' : pct > .25 ? '#ffaa00' : '#ff3333';
+      ctx.fillRect(bx, by, bw * pct, 5);
+    }
+
+    ctx.restore();
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LASER CLASS
+════════════════════════════════════════════════════════════════ */
+class Laser {
+  constructor(lane, sx) { this.lane = lane; this.sx = sx; this.life = 1; this.decay = 0.04; }
+  update() { this.life -= this.decay; }
+  get alive() { return this.life > 0; }
+  draw() {
+    const y = LANE_CY[this.lane];
+    const a = Math.min(1, this.life * 2);
+    ctx.save();
+
+    // Wide glow fill
+    const g = ctx.createLinearGradient(this.sx, 0, GAME_W, 0);
+    g.addColorStop(0, `rgba(0,255,200,${a * .4})`);
+    g.addColorStop(.4, `rgba(0,220,255,${a * .14})`);
+    g.addColorStop(1, 'rgba(0,180,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(this.sx, y - LANE_H * .44, GAME_W - this.sx, LANE_H * .88);
+
+    // Core glow
+    ctx.globalAlpha = a;
+    ctx.shadowColor = '#00ffee'; ctx.shadowBlur = 24;
+    ctx.fillStyle = 'rgba(80,255,220,.65)';
+    ctx.fillRect(this.sx, y - 9, GAME_W - this.sx, 18);
+
+    // Bright core
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(this.sx, y - 2.5, GAME_W - this.sx, 5);
+
+    ctx.restore();
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PARTICLE CLASS (sparks + shockwaves)
+════════════════════════════════════════════════════════════════ */
+class Particle {
+  constructor(x, y, sw = false) {
+    this.x = x; this.y = y; this.sw = sw;
+    if (sw) {
+      this.r = 4; this.maxR = 28 + Math.random() * 20;
+      this.life = 1; this.decay = 0.055;
+    } else {
+      const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 5;
+      this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 1.8;
+      this.r = 2 + Math.random() * 3;
+      this.life = 1; this.decay = 0.04 + Math.random() * 0.04;
+      const h = 15 + Math.random() * 35;
+      this.color = `hsl(${h},100%,65%)`;
+    }
+  }
+  update() {
+    this.life -= this.decay;
+    if (this.sw) {
+      const p = 1 - this.life;
+      this.r = this.maxR * p * (2 - p);
+    } else {
+      this.x += this.vx; this.y += this.vy;
+      this.vy += .14; this.vx *= .95;
+    }
+  }
+  get alive() { return this.life > 0; }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life);
+    if (this.sw) {
+      ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 3 * this.life;
+      ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(this.x, this.y, Math.max(0, this.r), 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TOWERS INIT
+════════════════════════════════════════════════════════════════ */
+function initTowers() {
+  towers = LANE_CY.map((cy, i) => ({
+    id: i, lane: i,
+    x: TOWER_X, y: cy,
+    state: 'ready',       // 'ready' | 'listening' | 'cooldown'
+    cdLeft: 0,
+    listenTO: null,
+    phrase: null,
+    chargeAnim: 0,
+  }));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DRAWING HELPERS
+════════════════════════════════════════════════════════════════ */
+function hexPath(cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i * 60 - 90) * Math.PI / 180;
+    i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+            : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+function rrect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#05050f';
+  ctx.fillRect(0, 0, GAME_W, GAME_H);
+
+  // Lane alternating tints
+  for (let i = 0; i < LANE_N; i++) {
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(0,30,80,.065)' : 'rgba(0,18,55,.04)';
+    ctx.fillRect(BASE_W, LANE_H * i, GAME_W - BASE_W, LANE_H);
+  }
+
+  // Grid dots
+  ctx.fillStyle = 'rgba(40,100,180,.065)';
+  for (let gx = BASE_W + 55; gx < GAME_W; gx += 75)
+    for (let gy = 22; gy < GAME_H; gy += 38)
+      ctx.fillRect(gx - 1, gy - 1, 2, 2);
+
+  // Lane dividers
+  ctx.strokeStyle = 'rgba(0,100,200,.28)';
+  ctx.lineWidth = 1; ctx.setLineDash([8, 18]);
+  for (let i = 1; i < LANE_N; i++) {
+    ctx.beginPath();
+    ctx.moveTo(BASE_W, LANE_H * i); ctx.lineTo(GAME_W, LANE_H * i);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Danger zone near base
+  const dg = ctx.createLinearGradient(BASE_W, 0, BASE_W + 90, 0);
+  dg.addColorStop(0, 'rgba(255,0,50,.055)'); dg.addColorStop(1, 'transparent');
+  ctx.fillStyle = dg; ctx.fillRect(BASE_W, 0, 90, GAME_H);
+}
+
+function drawBase() {
+  // Flash overlay
+  if (baseFlash > 0) {
+    ctx.fillStyle = `rgba(255,50,0,${baseFlash * .3})`;
+    ctx.fillRect(0, 0, BASE_W, GAME_H);
+  }
+
+  // Panel
+  const pg = ctx.createLinearGradient(0, 0, BASE_W, 0);
+  pg.addColorStop(0, '#050b1a'); pg.addColorStop(1, '#091428');
+  ctx.fillStyle = pg; ctx.fillRect(0, 0, BASE_W, GAME_H);
+
+  // Decorative horizontal lines
+  ctx.strokeStyle = 'rgba(0,100,200,.1)'; ctx.lineWidth = 1;
+  for (let y = 18; y < GAME_H - 18; y += 22) {
+    ctx.beginPath(); ctx.moveTo(7, y); ctx.lineTo(BASE_W - 7, y); ctx.stroke();
+  }
+
+  // Right border
+  ctx.strokeStyle = baseFlash > 0
+    ? `rgba(255,60,0,${.4 + baseFlash * .4})`
+    : 'rgba(0,120,230,.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(BASE_W, 0); ctx.lineTo(BASE_W, GAME_H); ctx.stroke();
+
+  // HP bar
+  const bw = BASE_W - 14, bx = 7, by = GAME_H / 2 + 24;
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx - 1, by - 1, bw + 2, 10);
+  const pct = baseHP / BASE_HP_MAX;
+  const bc = pct > .5 ? '#00dd66' : pct > .25 ? '#ffaa00' : '#ff2233';
+  ctx.fillStyle = bc; ctx.shadowColor = bc; ctx.shadowBlur = 8;
+  ctx.fillRect(bx, by, bw * pct, 8);
+  ctx.shadowBlur = 0;
+
+  // Label and HP number
+  ctx.fillStyle = 'rgba(0,150,255,.55)';
+  ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('BASE', BASE_W / 2, GAME_H / 2 - 14);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 12px Orbitron, monospace';
+  ctx.fillText(`${Math.max(0, Math.ceil(baseHP))}`, BASE_W / 2, GAME_H / 2 + 8);
+}
+
+const STATE_COL = { ready: '#00ff88', listening: '#ffaa00', cooldown: '#ff3344' };
+
+function drawTower(t) {
+  const { x, y, state, cdLeft, chargeAnim, phrase } = t;
+  const col = STATE_COL[state];
+  const pulse = state === 'listening' ? .5 + .5 * Math.sin(Date.now() / 140) : .38;
+
+  ctx.save();
+
+  // Aura
+  const ag = ctx.createRadialGradient(x, y, TOWER_R, x, y, TOWER_R + 28);
+  ag.addColorStop(0, col + Math.round(pulse * 88).toString(16).padStart(2,'0'));
+  ag.addColorStop(1, col + '00');
+  ctx.fillStyle = ag;
+  ctx.beginPath(); ctx.arc(x, y, TOWER_R + 28, 0, Math.PI * 2); ctx.fill();
+
+  // Hex body
+  hexPath(x, y, TOWER_R);
+  ctx.fillStyle = '#06101e'; ctx.fill();
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Cannon mount
+  ctx.fillStyle = '#0b1828';
+  ctx.fillRect(x - 3, y - 7, TOWER_R + 16, 14);
+
+  // Barrel tip
+  ctx.shadowColor = col; ctx.shadowBlur = 10;
+  ctx.fillStyle = col;
+  ctx.fillRect(x + TOWER_R + 9, y - 5, 7, 10);
+  ctx.shadowBlur = 0;
+
+  // Inner core
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = col + '55'; ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
+
+  // Cooldown arc
+  if (state === 'cooldown') {
+    const pct = cdLeft / COOLDOWN_MS;
+    ctx.beginPath();
+    ctx.arc(x, y, TOWER_R + 6, -Math.PI / 2, -Math.PI / 2 + (1 - pct) * Math.PI * 2);
+    ctx.strokeStyle = '#ff3344'; ctx.lineWidth = 3; ctx.stroke();
+
+    // Cooldown time text
+    ctx.fillStyle = 'rgba(255,80,80,.7)';
+    ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(`${Math.ceil(cdLeft / 1000)}s`, x, y + TOWER_R + 22);
+  }
+
+  // Charge flash
+  if (chargeAnim > 0) {
+    ctx.globalAlpha = chargeAnim * .7;
+    hexPath(x, y, TOWER_R + 16);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // "CLICK" hint when ready
+  if (state === 'ready') {
+    ctx.fillStyle = 'rgba(0,255,136,.5)';
+    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('CLICK', x, y + TOWER_R + 6);
+  }
+
+  // Speech bubble
+  if (state === 'listening' && phrase) drawBubble(x, y, phrase.text || phrase);
+
+  ctx.restore();
+}
+
+function drawBubble(tx, ty, text) {
+  ctx.font = 'bold 11px monospace';
+  const maxW = 210;
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW - 18) { if (cur) lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+
+  const lh = 16;
+  const bh = lines.length * lh + 14;
+  const bw = Math.min(maxW, Math.max(...lines.map(l => ctx.measureText(l).width)) + 22);
+  const bx = tx - bw / 2;
+  const by = ty - TOWER_R - bh - 18;
+  const br = 8;
+
+  ctx.save();
+  ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 16;
+
+  rrect(bx, by, bw, bh, br);
+  ctx.fillStyle = '#190d00'; ctx.fill();
+  ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(tx - 8, by + bh); ctx.lineTo(tx + 8, by + bh); ctx.lineTo(tx, ty - TOWER_R - 4);
+  ctx.closePath();
+  ctx.fillStyle = '#190d00'; ctx.fill();
+  ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 1; ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffee99';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = 'bold 11px monospace';
+  lines.forEach((l, i) => ctx.fillText(l, tx, by + 7 + i * lh));
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GAME LOGIC
+════════════════════════════════════════════════════════════════ */
+function spawnInterval() {
+  return Math.max(800, 2600 - wave * 280 - (WIN_SECS - timeLeft) * 7);
+}
+
+function spawnEnemyInLane(lane) {
+  let type;
+  if (wave >= 3 && Math.random() < .22) type = 'tank';
+  else if (wave >= 2 && Math.random() < .38) type = 'runner';
+  else type = 'grunt';
+  enemies.push(new Enemy(type, lane));
+}
+
+function fireTower(tower) {
+  tower.chargeAnim = 1.0;
+
+  // Kill all enemies in this lane instantly
+  const hit = [];
+  enemies.forEach(e => {
+    if (e.lane === tower.lane && !e.dead) {
+      e.dead = true; hit.push(e);
+      score += e.pts; killCount++;
+    }
+  });
+
+  lasers.push(new Laser(tower.lane, TOWER_X + TOWER_R + 8));
+
+  hit.forEach(e => {
+    for (let i = 0; i < 14; i++) particles.push(new Particle(e.x, e.y));
+    particles.push(new Particle(e.x, e.y, true));
+    particles.push(new Particle(e.x, e.y, true));
+  });
+
+  enemies = enemies.filter(e => !e.dead);
+
+  tower.state = 'cooldown';
+  tower.cdLeft = COOLDOWN_MS;
+  tower.phrase = null;
+}
+
+function onTowerClick(tower) {
+  if (!running) return;
+
+  // If clicked while listening, simulate successful voice recognition (Mock bypass)
+  if (tower.state === 'listening') {
+    clearTimeout(tower.listenTO);
+    stopListening();
+    fireTower(tower);
+    return;
+  }
+
+  if (tower.state !== 'ready') return;
+
+  // Cancel other listening towers
+  towers.forEach(t => {
+    if (t.state === 'listening') {
+      stopListening();
+      clearTimeout(t.listenTO);
+      t.state = 'ready'; t.phrase = null;
+    }
+  });
+
+  tower.state = 'listening';
+  tower.phrase = randPhrase();
+
+  validateVoiceCommand(tower.phrase, (matched) => {
+    clearTimeout(tower.listenTO);
+    stopListening();
+    if (matched) fireTower(tower);
+    else { tower.state = 'ready'; tower.phrase = null; }
+  });
+
+  tower.listenTO = setTimeout(() => {
+    if (tower.state === 'listening') {
+      stopListening();
+      tower.state = 'ready'; tower.phrase = null;
+    }
+  }, LISTEN_MS);
+}
+
+function hitBase(e) {
+  baseHP -= DMG_PER_HIT;
+  baseFlash = 1;
+  for (let i = 0; i < 8; i++) particles.push(new Particle(BASE_W + 8, e.y));
+  particles.push(new Particle(BASE_W + 8, e.y, true));
+  if (baseHP <= 0) { baseHP = 0; endGame(false); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MAIN LOOP
+════════════════════════════════════════════════════════════════ */
+let lastTs = 0;
+
+function loop(ts) {
+  if (!running) return;
+  const dt = Math.min((ts - lastTs) / 1000, .1);
+  lastTs = ts;
+
+  // Time
+  timeLeft = Math.max(0, timeLeft - dt);
+  if (timeLeft <= 0) { endGame(true); return; }
+
+  // Wave
+  waveTimer += dt;
+  if (waveTimer >= 30) { waveTimer -= 30; wave = Math.min(wave + 1, 5); }
+
+  // Spawn
+  for (let l = 0; l < LANE_N; l++) {
+    spawnTs[l] -= dt * 1000;
+    if (spawnTs[l] <= 0) {
+      spawnTs[l] = spawnInterval() + (Math.random() - .5) * 500;
+      spawnEnemyInLane(l);
+    }
+  }
+
+  // Update enemies
+  const hit = [];
+  enemies.forEach(e => {
+    e.update(dt);
+    if (e.x < BASE_W + e.sz && !e.dead) { e.dead = true; hit.push(e); }
+  });
+  hit.forEach(e => hitBase(e));
+  enemies = enemies.filter(e => !e.dead);
+
+  // Update towers
+  towers.forEach(t => {
+    if (t.state === 'cooldown') {
+      t.cdLeft -= dt * 1000;
+      if (t.cdLeft <= 0) { t.cdLeft = 0; t.state = 'ready'; }
+    }
+    if (t.chargeAnim > 0) t.chargeAnim = Math.max(0, t.chargeAnim - dt * 5);
+  });
+
+  lasers.forEach(l => l.update());
+  lasers = lasers.filter(l => l.alive);
+
+  particles.forEach(p => p.update());
+  particles = particles.filter(p => p.alive);
+
+  if (baseFlash > 0) baseFlash = Math.max(0, baseFlash - dt * 3.5);
+
+  drawFrame();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+
+function drawFrame() {
+  ctx.clearRect(0, 0, GAME_W, GAME_H);
+  drawBackground();
+  lasers.forEach(l => l.draw());
+  particles.forEach(p => p.draw());
+  enemies.forEach(e => e.draw());
+  drawBase();
+  towers.forEach(t => drawTower(t));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HUD
+════════════════════════════════════════════════════════════════ */
+function updateHUD() {
+  document.getElementById('hud-wave').textContent  = wave;
+  document.getElementById('hud-score').textContent = score;
+
+  const s = Math.max(0, Math.ceil(timeLeft));
+  const m = Math.floor(s / 60);
+  const tel = document.getElementById('hud-timer');
+  tel.textContent = `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  tel.className = s <= 15 ? 'warning' : '';
+
+  const pct = Math.max(0, baseHP / BASE_HP_MAX * 100);
+  const hf  = document.getElementById('base-hp-fill');
+  hf.style.width = pct + '%';
+  if (pct < 25) { hf.style.background = 'linear-gradient(90deg,#cc2200,#ff4400)'; hf.style.boxShadow = '0 0 8px rgba(255,60,0,.5)'; }
+  else if (pct < 50) { hf.style.background = 'linear-gradient(90deg,#cc8800,#ffbb00)'; hf.style.boxShadow = '0 0 8px rgba(255,180,0,.5)'; }
+  else { hf.style.background = ''; hf.style.boxShadow = ''; }
+  document.getElementById('hud-basehp').textContent = Math.max(0, Math.ceil(baseHP));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCREENS
+════════════════════════════════════════════════════════════════ */
+function showScreen(id) {
+  ['start-screen','win-screen','lose-screen'].forEach(sid => {
+    document.getElementById(sid).style.display = (sid === id) ? 'flex' : 'none';
+  });
+}
+
+function initGame() {
+  PHRASES = buildPhraseList();
+  baseHP = BASE_HP_MAX; score = 0; wave = 1;
+  timeLeft = WIN_SECS; waveTimer = 0;
+  enemies = []; lasers = []; particles = [];
+  baseFlash = 0; killCount = 0; eidNext = 0;
+  spawnTs = [900, 1500, 2200];
+  stopListening(); initTowers(); updateHUD();
+}
+
+function startGame() {
+  initGame();
+  showScreen(null);
+  running = true;
+  lastTs = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function endGame(won) {
+  running = false;
+  stopListening();
+  towers.forEach(t => { clearTimeout(t.listenTO); t.state = 'ready'; t.phrase = null; });
+
+  if (typeof VG !== 'undefined') VG.saveScore('voice-tower-defense', score);
+
+  if (won) {
+    document.getElementById('win-stat').textContent = `Score: ${score}  •  Enemies defeated: ${killCount}`;
+    showScreen('win-screen');
+  } else {
+    document.getElementById('lose-stat').textContent = `Score: ${score}  •  Wave: ${wave}`;
+    showScreen('lose-screen');
+  }
+  drawFrame();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   EVENT HANDLERS
+════════════════════════════════════════════════════════════════ */
+canvas.addEventListener('click', e => {
+  if (!running) return;
+  const {x, y} = csCoords(e);
+  for (const t of towers) {
+    const dx = x - t.x, dy = y - t.y;
+    if (Math.hypot(dx, dy) < TOWER_HIT) { onTowerClick(t); break; }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!running) return;
+  const {x, y} = csCoords(e);
+  const hovering = towers.some(t => Math.hypot(x - t.x, y - t.y) < TOWER_HIT && (t.state === 'ready' || t.state === 'listening'));
+  canvas.style.cursor = hovering ? 'pointer' : 'default';
+});
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-win').addEventListener('click', startGame);
+document.getElementById('restart-lose').addEventListener('click', startGame);
+
+/* ════════════════════════════════════════════════════════════════
+   BOOTSTRAP — draw static start frame
+════════════════════════════════════════════════════════════════ */
+initGame();
+drawBackground();
+drawBase();
+towers.forEach(t => drawTower(t));
+</script>
+</body>
+</html>
