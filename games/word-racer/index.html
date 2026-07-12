@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Клавагонка — VoiceGames</title>
+  <meta name="description" content="Произноси английские слова и гони к финишу! Обучающая игра для детей 6-8 лет.">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d1b2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Nunito', sans-serif;
+      overflow: hidden;
+    }
+
+    #game-shell {
+      width: min(100vw, 177.78vh);
+      height: min(100vh, 56.25vw);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      border: 4px solid #222;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    /* BACK BUTTON */
+    .menu-btn {
+      position: fixed; top: 10px; left: 10px; z-index: 999;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45rem;
+      background: #1a1a2e; border: 3px solid #444;
+      color: #aaa; padding: 6px 12px;
+      text-decoration: none; transition: color 0.2s;
+    }
+    .menu-btn:hover { color: #FFD700; border-color: #FFD700; }
+
+    /* HUD */
+    #hud {
+      background: #1a1a2e;
+      border-bottom: 5px solid #FFD700;
+      height: 64px;
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 0 16px 0 70px;
+      flex-shrink: 0; gap: 12px; z-index: 100;
+    }
+    .hud-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.4rem, 1.2vw, 0.7rem);
+      color: #FFD700; letter-spacing: 1px; white-space: nowrap;
+    }
+    #hud-timer-wrap {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.65rem, 2vw, 1rem);
+      color: #fff; background: #2a2a4a;
+      padding: 6px 14px; border: 3px solid #555;
+      box-shadow: 3px 3px 0 #111; white-space: nowrap;
+    }
+    #hud-timer.warning { color: #FF5555; animation: blink 0.5s ease infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .hud-score-wrap {
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.4rem, 1.2vw, 0.65rem);
+      color: #FFD700; white-space: nowrap;
+    }
+
+    /* GAME AREA */
+    #game-wrap { flex: 1; position: relative; overflow: hidden; }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* WORD PANEL (DOM overlay) */
+    #word-panel {
+      position: absolute; top: 48%; left: 50%;
+      transform: translate(-50%, -60%);
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px; z-index: 200;
+      pointer-events: none;
+    }
+
+    /* WORD CARD (pixel art) */
+    #word-card {
+      background: #FFFBE7;
+      border: 5px solid #222222;
+      box-shadow: 7px 7px 0 #111111,
+        inset -3px -3px 0 rgba(0,0,0,0.08),
+        inset 2px 2px 0 rgba(255,255,255,0.9);
+      padding: clamp(14px, 2.5vw, 26px) clamp(24px, 4vw, 48px);
+      min-width: clamp(200px, 28vw, 340px);
+      text-align: center;
+    }
+    #word-label {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.5rem, 1.1vw, 0.7rem);
+      font-weight: 700; color: #AAA;
+      text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px;
+    }
+    #word-text {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1.4rem, 4.5vw, 2.2rem);
+      color: #1a1a2e; letter-spacing: 3px; margin-bottom: 10px; line-height: 1.3;
+    }
+    #word-translation {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.65rem, 1.5vw, 0.95rem);
+      font-weight: 700; color: #777;
+    }
+    #word-progress {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.3rem, 0.7vw, 0.45rem);
+      color: #BBB; margin-top: 8px;
+    }
+
+    /* MIC BUTTON */
+    #mic-btn {
+      pointer-events: all;
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.4rem, 1.1vw, 0.6rem);
+      background: #44BB44; color: #fff;
+      border: 4px solid #2A8A2A;
+      box-shadow: 5px 5px 0 #1a5e1a, inset -2px -2px 0 rgba(0,0,0,0.15);
+      padding: clamp(10px, 1.8vw, 16px) clamp(18px, 3vw, 28px);
+      cursor: pointer; transition: transform 0.1s; letter-spacing: 1px;
+    }
+    #mic-btn:hover:not(:disabled) { transform: translateY(-2px); }
+    #mic-btn:active:not(:disabled) {
+      transform: translate(3px, 3px); box-shadow: 2px 2px 0 #1a5e1a;
+    }
+    #mic-btn:disabled {
+      background: #888; border-color: #666;
+      box-shadow: 3px 3px 0 #444; cursor: not-allowed;
+    }
+    #mic-btn.listening {
+      background: #CC2222; border-color: #991111;
+      box-shadow: 5px 5px 0 #660000, inset -2px -2px 0 rgba(0,0,0,0.15);
+      animation: micPulse 0.55s ease infinite;
+    }
+    @keyframes micPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+
+    /* FEEDBACK */
+    #feedback {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.35rem, 0.9vw, 0.55rem);
+      min-height: 22px; text-align: center;
+      padding: 4px 10px; letter-spacing: 1px;
+    }
+    #feedback.correct { color: #44BB44; }
+    #feedback.wrong   { color: #EE4444; }
+
+    /* OVERLAY SCREENS */
+    .screen-overlay {
+      position: absolute; inset: 0;
+      background: rgba(10, 14, 28, 0.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; z-index: 800;
+      text-align: center; padding: 2rem;
+    }
+    .so-emoji { font-size: clamp(2rem, 6vw, 3.5rem); }
+    .so-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.7rem, 2.5vw, 1.3rem); line-height: 1.6;
+    }
+    #start-screen .so-title { color: #FFD700; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+    #win-screen .so-title   { color: #44FF88; text-shadow: 0 0 20px rgba(68,255,136,0.5); }
+    #lose-screen .so-title  { color: #FF4466; text-shadow: 0 0 20px rgba(255,68,100,0.5); }
+    .so-sub {
+      font-family: 'Nunito', sans-serif;
+      font-size: clamp(0.75rem, 1.8vw, 1.05rem);
+      color: rgba(255,255,255,0.55); max-width: 420px; line-height: 1.7;
+    }
+    .so-stat {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.38rem, 0.9vw, 0.55rem);
+      color: rgba(255,255,255,0.75);
+    }
+    .so-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(0.42rem, 1.1vw, 0.62rem);
+      letter-spacing: 1px;
+      padding: clamp(10px, 1.8vw, 14px) clamp(20px, 3.5vw, 28px);
+      border: 4px solid transparent; cursor: pointer;
+      transition: all 0.15s; box-shadow: 5px 5px 0 rgba(0,0,0,0.4);
+    }
+    .so-btn:hover { transform: translateY(-2px); }
+    .so-btn:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 rgba(0,0,0,0.4); }
+    #start-screen .so-btn.primary {
+      background: linear-gradient(135deg, #1a6600, #44BB00);
+      color: #fff; border-color: #2A8B00;
+    }
+    #win-screen .so-btn.primary {
+      background: linear-gradient(135deg, #006633, #00FF88);
+      color: #002211; border-color: #00AA55;
+    }
+    #lose-screen .so-btn.primary {
+      background: linear-gradient(135deg, #880011, #CC0033);
+      color: #fff; border-color: #660011;
+    }
+    .so-btn.secondary {
+      background: rgba(255,255,255,0.06) !important;
+      color: rgba(255,255,255,0.45) !important;
+      border-color: rgba(255,255,255,0.12) !important;
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.2) !important;
+    }
+    .instructions {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      justify-content: center; max-width: 440px;
+    }
+    .instr-item {
+      font-family: 'Nunito', sans-serif;
+      background: rgba(255,215,0,0.07);
+      border: 2px solid rgba(255,215,0,0.18);
+      border-radius: 6px; padding: 8px 14px;
+      font-size: clamp(0.6rem, 1.3vw, 0.8rem);
+      color: rgba(255,255,255,0.65); text-align: left;
+    }
+    .instr-item strong {
+      display: block; color: #FFD700;
+      margin-bottom: 2px; font-size: 0.75em;
+    }
+  </style>
+</head>
+<body>
+
+<a href="../../play.html" class="menu-btn">&#8592; Меню</a>
+
+<div id="game-shell">
+  <!-- HUD -->
+  <div id="hud">
+    <span class="hud-title">&#127950; КЛАВАГОНКА</span>
+    <div id="hud-timer-wrap">&#9201; <span id="hud-timer">1:30</span></div>
+    <div class="hud-score-wrap">&#11088; <span id="hud-score">0</span></div>
+  </div>
+
+  <!-- GAME WRAP -->
+  <div id="game-wrap">
+    <canvas id="canvas"></canvas>
+
+    <!-- Word panel overlay -->
+    <div id="word-panel">
+      <div id="word-card">
+        <div id="word-label">Say the word!</div>
+        <div id="word-text">&#8212;</div>
+        <div id="word-translation"></div>
+        <div id="word-progress"></div>
+      </div>
+      <button id="mic-btn" disabled>&#127908; SAY IT!</button>
+      <div id="feedback"></div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div class="screen-overlay" id="start-screen">
+      <div class="so-emoji">&#127950;&#10024;</div>
+      <div class="so-title">КЛАВАГОНКА</div>
+      <div class="so-sub">Посмотри на слово, нажми на микрофон и произнеси его по-английски! Каждое слово везёт машинку к финишу!</div>
+      <div class="instructions">
+        <div class="instr-item"><strong>1. Смотри &#128064;</strong>Прочитай слово на карточке</div>
+        <div class="instr-item"><strong>2. Нажми &#127908;</strong>Нажми большую кнопку</div>
+        <div class="instr-item"><strong>3. Говори &#128483;</strong>Скажи слово по-английски</div>
+        <div class="instr-item"><strong>4. Едь &#127937;</strong>Доберись до финиша!</div>
+      </div>
+      <button class="so-btn primary" id="start-btn">&#9654; СТАРТ!</button>
+      <a href="../../play.html" class="so-btn secondary">&#8592; Меню</a>
+    </div>
+
+    <!-- WIN SCREEN -->
+    <div class="screen-overlay" id="win-screen" style="display:none">
+      <div class="so-emoji">&#127937;&#127942;</div>
+      <div class="so-title">ФИНИШ!<br>МОЛОДЕЦ!</div>
+      <div class="so-sub">Ты доехал до финиша! Отличное произношение!</div>
+      <div class="so-stat" id="win-stat"></div>
+      <button class="so-btn primary" id="restart-win">&#9654; ЕЩЕ РАЗ!</button>
+      <a href="../../play.html" class="so-btn secondary">&#8592; Меню</a>
+    </div>
+
+    <!-- LOSE SCREEN -->
+    <div class="screen-overlay" id="lose-screen" style="display:none">
+      <div class="so-emoji">&#9203;&#128517;</div>
+      <div class="so-title">ВРЕМЯ<br>ВЫШЛО!</div>
+      <div class="so-sub">Не сдавайся! Попробуй ещё раз и доберись до финиша!</div>
+      <div class="so-stat" id="lose-stat"></div>
+      <button class="so-btn primary" id="restart-lose">&#9654; ЕЩЕ РАЗ!</button>
+      <a href="../../play.html" class="so-btn secondary">&#8592; Меню</a>
+    </div>
+
+  </div><!-- /game-wrap -->
+</div><!-- /game-shell -->
+
+<script src="../shared/wordlists.js"></script>
+<script src="../shared/utils.js"></script>
+<script>
+/* ────────────────────────────────────────────────────────
+   WORD LIST  (kid-friendly single words, ages 6-8)
+──────────────────────────────────────────────────────── */
+const BUILT_IN_WORDS = [
+  { word: 'cat',    ru: 'кошка' },
+  { word: 'dog',    ru: 'собака' },
+  { word: 'sun',    ru: 'солнце' },
+  { word: 'tree',   ru: 'дерево' },
+  { word: 'house',  ru: 'дом' },
+  { word: 'ball',   ru: 'мяч' },
+  { word: 'book',   ru: 'книга' },
+  { word: 'star',   ru: 'звезда' },
+  { word: 'bird',   ru: 'птица' },
+  { word: 'fish',   ru: 'рыба' },
+  { word: 'frog',   ru: 'лягушка' },
+  { word: 'apple',  ru: 'яблоко' },
+  { word: 'flower', ru: 'цветок' },
+  { word: 'cake',   ru: 'торт' },
+  { word: 'moon',   ru: 'луна' },
+  { word: 'rain',   ru: 'дождь' },
+  { word: 'fox',    ru: 'лиса' },
+  { word: 'bear',   ru: 'медведь' },
+  { word: 'duck',   ru: 'утка' },
+  { word: 'bus',    ru: 'автобус' },
+  { word: 'cup',    ru: 'чашка' },
+  { word: 'milk',   ru: 'молоко' },
+  { word: 'car',    ru: 'машина' },
+  { word: 'hat',    ru: 'шляпа' },
+  { word: 'drum',   ru: 'барабан' },
+  { word: 'kite',   ru: 'воздушный змей' },
+  { word: 'lamp',   ru: 'лампа' },
+  { word: 'ship',   ru: 'корабль' },
+  { word: 'wolf',   ru: 'волк' },
+  { word: 'map',    ru: 'карта' },
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildGameWords() {
+  // Try to pull simple single words from VG_TOPICS if available
+  const extra = [];
+  if (typeof VG_TOPICS !== 'undefined') {
+    for (const key of Object.keys(VG_TOPICS)) {
+      const topic = VG_TOPICS[key];
+      if (topic.words) {
+        for (const cat of Object.values(topic.words)) {
+          if (Array.isArray(cat)) {
+            cat.forEach(w => {
+              if (w && w.word && w.word.length <= 9 && !w.word.includes(' ')) {
+                extra.push(w);
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+  return shuffleArray([...BUILT_IN_WORDS, ...extra]).slice(0, 30);
+}
+
+/* ────────────────────────────────────────────────────────
+   SPEECH API
+──────────────────────────────────────────────────────── */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _rec = null, _vcb = null;
+
+function validateVoiceCommand(wordObj, callback) {
+  startListening(wordObj, callback);
+}
+
+function startListening(wordObj, cb) {
+  _vcb = cb;
+  if (!SR) {
+    console.warn('WordRacer: SpeechRecognition not supported — click mic again for mock success.');
+    return;
+  }
+  if (_rec) { try { _rec.abort(); } catch(e) {} }
+
+  const r = new SR();
+  _rec = r;
+  r.lang = 'en-US';
+  r.interimResults = false;
+  r.maxAlternatives = 5;
+  r.continuous = false;
+
+  r.onresult = ev => {
+    if (!_vcb) return;
+    const target = wordObj.word.toLowerCase();
+    const alts = Array.from({ length: ev.results[0].length }, (_, i) =>
+      ev.results[0][i].transcript.toLowerCase().trim());
+    const matched = alts.some(a => a === target || a.startsWith(target) || a.includes(target));
+    const done = _vcb; _vcb = null; _rec = null;
+    done(matched);
+  };
+
+  r.onerror = e => {
+    if (e.error === 'aborted') return;
+    if (_vcb && e.error === 'no-speech') try { r.start(); } catch(e2) {}
+  };
+  r.onend = () => { if (_vcb && _rec === r) try { r.start(); } catch(e) {} };
+
+  try { r.start(); } catch(e) { console.warn('WordRacer: recognition start failed', e); }
+}
+
+function stopListening() {
+  _vcb = null;
+  if (_rec) { try { _rec.abort(); } catch(e) {} _rec = null; }
+}
+
+/* ────────────────────────────────────────────────────────
+   CANVAS CONSTANTS
+──────────────────────────────────────────────────────── */
+const GAME_W = 960;
+const GAME_H = 480;
+
+const HORIZON_Y  = 298;
+const GRASS_UP_Y = 288;
+const ROAD_MID_Y = 380;
+
+const CAR_Y       = 362;
+const CAR_X_START = 90;
+const CAR_X_END   = 855;
+const FINISH_X    = 900;
+
+const WORDS_TO_WIN = 8;
+const GAME_TIME    = 90;
+
+/* ────────────────────────────────────────────────────────
+   CANVAS SETUP
+──────────────────────────────────────────────────────── */
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+canvas.width  = GAME_W;
+canvas.height = GAME_H;
+ctx.imageSmoothingEnabled = false;
+
+/* ────────────────────────────────────────────────────────
+   GAME STATE
+──────────────────────────────────────────────────────── */
+let running      = false;
+let timeLeft     = GAME_TIME;
+let score        = 0;
+let wordsCorrect = 0;
+let wordIdx      = 0;
+let GAME_WORDS   = [];
+
+let carCurrentX  = CAR_X_START;
+let carTargetX   = CAR_X_START;
+let carMoving    = false;
+let carWheelRot  = 0;
+
+let listening    = false;
+let awaitingNext = false;
+
+/* ────────────────────────────────────────────────────────
+   CLOUDS
+──────────────────────────────────────────────────────── */
+let clouds = [];
+function initClouds() {
+  clouds = [
+    { x: 70,   y: 55, scale: 1.2,  speed: 18 },
+    { x: 320,  y: 38, scale: 0.85, speed: 14 },
+    { x: 570,  y: 72, scale: 1.35, speed: 20 },
+    { x: 790,  y: 44, scale: 1.0,  speed: 16 },
+    { x: 1050, y: 65, scale: 1.1,  speed: 15 },
+  ];
+}
+
+/* ────────────────────────────────────────────────────────
+   PARTICLES  (star sparks)
+──────────────────────────────────────────────────────── */
+let particles = [];
+const STAR_COLS = ['#FFD700','#FF6B6B','#4ECDC4','#A8E063','#FF8E53','#CC88FF'];
+
+class Particle {
+  constructor(x, y, big = false) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd   = big ? (3 + Math.random() * 6) : (2 + Math.random() * 4);
+    this.x  = x; this.y = y;
+    this.vx = Math.cos(angle) * spd;
+    this.vy = Math.sin(angle) * spd - (big ? 5 : 3);
+    this.life  = 1;
+    this.decay = big ? 0.016 : 0.022;
+    this.size  = big ? (8 + Math.random() * 8) : (5 + Math.random() * 5);
+    this.color = STAR_COLS[Math.floor(Math.random() * STAR_COLS.length)];
+    this.rot   = Math.random() * Math.PI * 2;
+    this.rotSp = (Math.random() - 0.5) * 0.2;
+  }
+  update() {
+    this.x += this.vx; this.y += this.vy;
+    this.vy += 0.12; this.vx *= 0.98;
+    this.life -= this.decay; this.rot += this.rotSp;
+  }
+  get alive() { return this.life > 0; }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.fillStyle   = this.color;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    const s = this.size * Math.max(0, this.life);
+    ctx.fillRect(-s / 2, -1.5, s, 3);
+    ctx.fillRect(-1.5, -s / 2, 3, s);
+    ctx.restore();
+  }
+}
+
+function spawnStars(x, y, n = 12, big = false) {
+  for (let i = 0; i < n; i++) particles.push(new Particle(x, y, big));
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: SKY
+──────────────────────────────────────────────────────── */
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+  g.addColorStop(0,   '#4AA8E8');
+  g.addColorStop(0.55,'#7AC8F0');
+  g.addColorStop(1,   '#A8E0FA');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, GAME_W, HORIZON_Y);
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: CLOUDS
+──────────────────────────────────────────────────────── */
+function drawCloud(x, y, scale) {
+  ctx.save();
+  ctx.fillStyle   = '#FFFFFF';
+  ctx.shadowColor = 'rgba(160,200,240,0.6)';
+  ctx.shadowBlur  = 10;
+  [
+    [0,    0,   22],
+    [24,  -11,  27],
+    [52,   0,   20],
+    [24,   7,   24],
+    [-10,  4,   16],
+    [58,   5,   16],
+  ].forEach(([dx, dy, r]) => {
+    ctx.beginPath();
+    ctx.arc(x + dx * scale, y + dy * scale, r * scale, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: ROLLING HILLS
+──────────────────────────────────────────────────────── */
+function drawHills() {
+  [
+    { cx: 120,  rx: 130, col: '#78CC68' },
+    { cx: 350,  rx: 110, col: '#6CC05A' },
+    { cx: 560,  rx: 140, col: '#78CC68' },
+    { cx: 780,  rx: 120, col: '#6CC05A' },
+    { cx: 960,  rx: 100, col: '#72C462' },
+  ].forEach(h => {
+    ctx.fillStyle = h.col;
+    ctx.beginPath();
+    ctx.ellipse(h.cx, HORIZON_Y + 14, h.rx, 44, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = '#4A9C3A';
+  ctx.fillRect(0, HORIZON_Y - 4, GAME_W, 10);
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: TREE
+──────────────────────────────────────────────────────── */
+function drawTree(x, baseY) {
+  ctx.save();
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(x, baseY + 4, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+  // Trunk
+  ctx.fillStyle = '#8B5E3C';
+  ctx.fillRect(x - 6, baseY - 14, 12, 20);
+  // Foliage layers
+  [
+    { w: 26, y: -24, col: '#2A7D2A' },
+    { w: 21, y: -16, col: '#38A038' },
+    { w: 15, y: -8,  col: '#4ABB4A' },
+  ].forEach(l => {
+    ctx.fillStyle = l.col;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY - 62 + l.y);
+    ctx.lineTo(x - l.w, baseY + l.y);
+    ctx.lineTo(x + l.w, baseY + l.y);
+    ctx.closePath(); ctx.fill();
+  });
+  ctx.restore();
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: ROAD
+──────────────────────────────────────────────────────── */
+function drawRoad() {
+  // Grass above
+  ctx.fillStyle = '#5CB85C';
+  ctx.fillRect(0, GRASS_UP_Y, GAME_W, HORIZON_Y - GRASS_UP_Y + 8);
+  // Road surface gradient
+  const rg = ctx.createLinearGradient(0, HORIZON_Y, 0, GAME_H);
+  rg.addColorStop(0,   '#868686');
+  rg.addColorStop(0.08,'#797979');
+  rg.addColorStop(1,   '#727272');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, HORIZON_Y, GAME_W, GAME_H - HORIZON_Y);
+  // Edge line
+  ctx.fillStyle = '#FFFFAA';
+  ctx.fillRect(0, HORIZON_Y + 2, GAME_W, 5);
+  // Center dashes
+  ctx.fillStyle = '#FFFF88';
+  for (let dx = 0; dx < GAME_W; dx += 72) ctx.fillRect(dx, ROAD_MID_Y + 22, 44, 5);
+  // Bottom grass
+  ctx.fillStyle = '#5CB85C'; ctx.fillRect(0, GAME_H - 18, GAME_W, 18);
+  ctx.fillStyle = '#4A9C3A'; ctx.fillRect(0, GAME_H - 22, GAME_W, 4);
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: PROGRESS DOTS (word checkpoints)
+──────────────────────────────────────────────────────── */
+function drawProgressDots() {
+  const dotY  = CAR_Y + 32;
+  const startX = CAR_X_START - 10;
+  const endX   = CAR_X_END + 10;
+
+  for (let i = 0; i < WORDS_TO_WIN; i++) {
+    const dotX = startX + (i / (WORDS_TO_WIN - 1)) * (endX - startX);
+    const done = i < wordsCorrect;
+    if (done) {
+      ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 8;
+      ctx.fillStyle = '#FFD700';
+    } else {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    }
+    ctx.beginPath(); ctx.arc(dotX, dotY, done ? 7 : 5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: FINISH FLAG
+──────────────────────────────────────────────────────── */
+function drawFinishFlag(fx, groundY) {
+  const poleH = 74, cell = 7, cols = 5, rows = 4;
+  const topY  = groundY - poleH;
+  // Pole shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(fx + 4, topY + 4, 5, poleH);
+  // Pole
+  ctx.fillStyle = '#BBBBBB'; ctx.fillRect(fx, topY, 5, poleH);
+  ctx.fillStyle = '#888888'; ctx.fillRect(fx + 2, topY, 3, poleH);
+  // Checkerboard
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#111111' : '#FFFFFF';
+      ctx.fillRect(fx + 5 + c * cell, topY + r * cell, cell, cell);
+    }
+  }
+  // Gold tip
+  ctx.fillStyle = '#FFD700';
+  ctx.beginPath(); ctx.arc(fx + 2, topY, 5, 0, Math.PI * 2); ctx.fill();
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW: PIXEL-ART CAR (side view, facing right)
+──────────────────────────────────────────────────────── */
+function drawCar(cx, groundY) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  const bounce = carMoving ? Math.sin(Date.now() / 88) * 1.6 : 0;
+  const wy = groundY;     // wheel center y
+  const by = wy - 2;      // body bottom y
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx, wy + 7, 46, 7, 0, 0, Math.PI * 2); ctx.fill();
+
+  // WHEELS
+  [cx - 26, cx + 26].forEach(wx => {
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(wx, wy + bounce, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(wx - 2, wy - 3 + bounce, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#AAAAAA';
+    ctx.beginPath(); ctx.arc(wx, wy + bounce, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#CCCCCC';
+    ctx.beginPath(); ctx.arc(wx, wy + bounce, 3, 0, Math.PI * 2); ctx.fill();
+    if (carMoving) {
+      ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5;
+      for (let a = 0; a < 3; a++) {
+        const ang = carWheelRot + a * Math.PI * 2 / 3;
+        ctx.beginPath();
+        ctx.moveTo(wx, wy + bounce);
+        ctx.lineTo(wx + Math.cos(ang) * 5, wy + bounce + Math.sin(ang) * 5);
+        ctx.stroke();
+      }
+    }
+  });
+
+  // BODY (lower)
+  ctx.fillStyle = '#EE3333'; ctx.fillRect(cx - 42, by - 22 + bounce, 84, 22);
+  ctx.fillStyle = '#FF5555'; ctx.fillRect(cx - 42, by - 22 + bounce, 84, 5);  // highlight
+  ctx.fillStyle = '#CC1111'; ctx.fillRect(cx - 42, by - 5  + bounce, 84, 5);  // shadow
+  ctx.fillStyle = '#AA0000'; ctx.fillRect(cx - 38, by - 5  + bounce, 76, 3);  // skirt
+
+  // CABIN (upper)
+  ctx.fillStyle = '#CC2222'; ctx.fillRect(cx - 27, by - 40 + bounce, 52, 20);
+  ctx.fillStyle = '#AA1111';
+  ctx.fillRect(cx - 27, by - 40 + bounce, 52, 3);
+  ctx.fillRect(cx - 27, by - 40 + bounce, 3, 20);
+
+  // WINDOWS
+  ctx.fillStyle = '#99DDFF';
+  ctx.fillRect(cx - 23, by - 37 + bounce, 18, 13);
+  ctx.fillRect(cx,      by - 37 + bounce, 20, 13);
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.fillRect(cx - 23, by - 37 + bounce, 6, 5);
+  ctx.fillRect(cx,      by - 37 + bounce, 6, 5);
+  ctx.fillStyle = '#AA1111'; ctx.fillRect(cx - 4, by - 37 + bounce, 3, 13);
+
+  // HEADLIGHTS (right = front)
+  ctx.fillStyle = '#FFEE44'; ctx.fillRect(cx + 36, by - 20 + bounce, 8, 9);
+  ctx.fillStyle = '#FFBB00'; ctx.fillRect(cx + 36, by - 18 + bounce, 8, 3);
+  ctx.fillStyle = 'rgba(255,240,100,0.18)';
+  ctx.beginPath(); ctx.arc(cx + 48, by - 16 + bounce, 14, 0, Math.PI * 2); ctx.fill();
+
+  // BUMPER
+  ctx.fillStyle = '#AAAAAA'; ctx.fillRect(cx + 39, by - 11 + bounce, 6, 8);
+  ctx.fillStyle = '#888888'; ctx.fillRect(cx + 39, by - 8  + bounce, 6, 3);
+
+  // REAR LIGHTS (left = rear)
+  ctx.fillStyle = '#FF3333'; ctx.fillRect(cx - 44, by - 20 + bounce, 5, 9);
+  ctx.fillStyle = '#CC1111'; ctx.fillRect(cx - 44, by - 17 + bounce, 5, 3);
+
+  // EXHAUST puff when moving
+  if (carMoving) {
+    const pa = 0.28 + 0.1 * Math.sin(Date.now() / 120);
+    ctx.fillStyle = `rgba(200,200,200,${pa})`;
+    ctx.beginPath(); ctx.arc(cx - 46, by - 8  + bounce, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - 50, by - 12 + bounce, 3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/* ────────────────────────────────────────────────────────
+   DRAW FULL FRAME
+──────────────────────────────────────────────────────── */
+const TREE_XS = [100, 205, 455, 680, 825, 920];
+
+function drawFrame() {
+  ctx.clearRect(0, 0, GAME_W, GAME_H);
+  drawSky();
+  clouds.forEach(c => drawCloud(c.x, c.y, c.scale));
+  drawHills();
+  TREE_XS.forEach(tx => drawTree(tx, GRASS_UP_Y + 8));
+  drawRoad();
+  drawProgressDots();
+  drawFinishFlag(FINISH_X, HORIZON_Y);
+  particles.forEach(p => p.draw());
+  drawCar(carCurrentX, CAR_Y);
+}
+
+/* ────────────────────────────────────────────────────────
+   GAME LOOP
+──────────────────────────────────────────────────────── */
+let lastTs = 0;
+
+function loop(ts) {
+  if (!running) return;
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+
+  // Timer
+  timeLeft = Math.max(0, timeLeft - dt);
+  if (timeLeft <= 0) { endGame(false); return; }
+
+  // Clouds drift left
+  clouds.forEach(c => {
+    c.x -= c.speed * dt;
+    if (c.x + 90 * c.scale < 0) c.x = GAME_W + 60;
+  });
+
+  // Car lerp toward target
+  carCurrentX += (carTargetX - carCurrentX) * 0.055;
+  carMoving    = Math.abs(carCurrentX - carTargetX) > 0.8;
+  if (carMoving) carWheelRot += dt * 12;
+
+  // Particles
+  particles.forEach(p => p.update());
+  particles = particles.filter(p => p.alive);
+
+  drawFrame();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+
+/* ────────────────────────────────────────────────────────
+   HUD
+──────────────────────────────────────────────────────── */
+function updateHUD() {
+  const s = Math.max(0, Math.ceil(timeLeft));
+  const m = Math.floor(s / 60);
+  const timerEl = document.getElementById('hud-timer');
+  timerEl.textContent = `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  timerEl.className   = s <= 15 ? 'warning' : '';
+  document.getElementById('hud-score').textContent = score;
+}
+
+/* ────────────────────────────────────────────────────────
+   WORD CARD UI
+──────────────────────────────────────────────────────── */
+function showWord(w) {
+  document.getElementById('word-text').textContent =
+    w.word.toUpperCase();
+  document.getElementById('word-translation').textContent = w.ru;
+  document.getElementById('word-progress').textContent =
+    `Word ${wordsCorrect + 1} of ${WORDS_TO_WIN}`;
+  document.getElementById('word-label').textContent = 'Say the word!';
+  setMicState('idle');
+  showFeedback('', '');
+  listening = false; awaitingNext = false;
+}
+
+function showFeedback(text, type) {
+  const el = document.getElementById('feedback');
+  el.textContent = text; el.className = type;
+}
+
+function setMicState(state) {
+  const btn = document.getElementById('mic-btn');
+  if (state === 'idle') {
+    btn.disabled = false; btn.className = '';
+    btn.textContent = '\uD83C\uDF99 SAY IT!';
+  } else if (state === 'listening') {
+    btn.disabled = false; btn.className = 'listening';
+    btn.textContent = '\uD83D\uDD34 LISTENING...';
+  } else {
+    btn.disabled = true; btn.className = '';
+    btn.textContent = '\u23F3...';
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   MIC CLICK HANDLER
+──────────────────────────────────────────────────────── */
+function onMicClick() {
+  if (!running || awaitingNext) return;
+  // Mock bypass: click again while listening = instant success
+  if (listening) { stopListening(); onResult(true); return; }
+
+  listening = true;
+  setMicState('listening');
+  showFeedback('', '');
+  validateVoiceCommand(GAME_WORDS[wordIdx], onResult);
+}
+
+/* ────────────────────────────────────────────────────────
+   VOICE RESULT HANDLER
+──────────────────────────────────────────────────────── */
+function onResult(matched) {
+  listening = false; awaitingNext = true;
+  setMicState('locked');
+
+  if (matched) {
+    const praise = ['Great! \u2B50','Awesome! \u2728','Nice! \uD83C\uDF1F','Perfect! \uD83D\uDCAB','Brilliant! \uD83C\uDF89'];
+    showFeedback(praise[Math.floor(Math.random() * praise.length)], 'correct');
+
+    wordsCorrect++;
+    score += 10;
+    spawnStars(carCurrentX, CAR_Y - 20, 14);
+    carTargetX = CAR_X_START + (wordsCorrect / WORDS_TO_WIN) * (CAR_X_END - CAR_X_START);
+
+    if (wordsCorrect >= WORDS_TO_WIN) {
+      setTimeout(() => endGame(true), 1300);
+    } else {
+      setTimeout(() => {
+        wordIdx = (wordIdx + 1) % GAME_WORDS.length;
+        showWord(GAME_WORDS[wordIdx]);
+      }, 1300);
+    }
+  } else {
+    showFeedback('Almost! Try again! \uD83D\uDCAA', 'wrong');
+    setTimeout(() => {
+      setMicState('idle');
+      showFeedback('', '');
+      awaitingNext = false;
+    }, 1300);
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   SCREEN MANAGEMENT
+──────────────────────────────────────────────────────── */
+function showScreen(id) {
+  ['start-screen','win-screen','lose-screen'].forEach(sid => {
+    document.getElementById(sid).style.display = sid === id ? 'flex' : 'none';
+  });
+}
+
+/* ────────────────────────────────────────────────────────
+   GAME INIT / START / END
+──────────────────────────────────────────────────────── */
+function initGame() {
+  GAME_WORDS   = shuffleArray(buildGameWords());
+  wordIdx      = 0;
+  timeLeft     = GAME_TIME;
+  score        = 0;
+  wordsCorrect = 0;
+  carCurrentX  = CAR_X_START;
+  carTargetX   = CAR_X_START;
+  carMoving    = false;
+  carWheelRot  = 0;
+  listening    = false;
+  awaitingNext = false;
+  particles    = [];
+  initClouds();
+  stopListening();
+  updateHUD();
+}
+
+function startGame() {
+  initGame();
+  showScreen(null);
+  document.getElementById('word-panel').style.display = 'flex';
+  showWord(GAME_WORDS[0]);
+  running = true;
+  lastTs  = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function endGame(won) {
+  running = false;
+  stopListening();
+  listening = false;
+
+  if (won) spawnStars(FINISH_X - 20, HORIZON_Y - 40, 40, true);
+  if (typeof VG !== 'undefined') VG.saveScore('word-racer', score);
+
+  drawFrame();
+  setTimeout(() => {
+    document.getElementById('word-panel').style.display = 'none';
+    if (won) {
+      document.getElementById('win-stat').textContent =
+        `\u041e\u0447\u043a\u0438: ${score}  \u2022  \u0421\u043b\u043e\u0432: ${wordsCorrect}/${WORDS_TO_WIN}`;
+      showScreen('win-screen');
+    } else {
+      document.getElementById('lose-stat').textContent =
+        `\u041e\u0447\u043a\u0438: ${score}  \u2022  \u0421\u043b\u043e\u0432: ${wordsCorrect}/${WORDS_TO_WIN}`;
+      showScreen('lose-screen');
+    }
+  }, won ? 1600 : 200);
+}
+
+/* ────────────────────────────────────────────────────────
+   EVENT HANDLERS
+──────────────────────────────────────────────────────── */
+document.getElementById('mic-btn').addEventListener('click', onMicClick);
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-win').addEventListener('click', startGame);
+document.getElementById('restart-lose').addEventListener('click', startGame);
+
+/* ────────────────────────────────────────────────────────
+   BOOTSTRAP  — draw static start scene
+──────────────────────────────────────────────────────── */
+initGame();
+drawFrame();
+document.getElementById('word-panel').style.display = 'none';
+</script>
+</body>
+</html>

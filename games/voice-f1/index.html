@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice F1: Overtake — VoiceGames</title>
+  <meta name="description" content="Race your F1 car to the top by saying phrases correctly to dodge and overtake rival cars!">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    /* ══════════════════════════════════════════
+       RESET & BASE
+    ══════════════════════════════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #060a14;
+      color: #fff;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ══════════════════════════════════════════
+       BACK BUTTON
+    ══════════════════════════════════════════ */
+    .menu-btn {
+      position: fixed;
+      top: 12px; left: 12px;
+      z-index: 900;
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(6,14,32,0.95);
+      border: 1px solid rgba(255,80,80,0.35);
+      color: #ff9090;
+      padding: 7px 15px;
+      border-radius: 50px;
+      font-size: 0.8em; font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all .2s;
+      backdrop-filter: blur(12px);
+    }
+    .menu-btn:hover { border-color: #ff4444; color: #ffbaba; box-shadow: 0 0 14px rgba(255,60,60,0.3); }
+
+    /* ══════════════════════════════════════════
+       CANVAS WRAPPER
+    ══════════════════════════════════════════ */
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* ══════════════════════════════════════════
+       LEADERBOARD (right sidebar)
+    ══════════════════════════════════════════ */
+    #leaderboard {
+      position: fixed;
+      right: 0; top: 0; bottom: 0;
+      width: 170px;
+      background: rgba(4,10,24,0.93);
+      border-left: 1px solid rgba(255,80,80,0.2);
+      backdrop-filter: blur(10px);
+      display: flex; flex-direction: column;
+      padding: 14px 0 10px;
+      z-index: 200;
+    }
+    #leaderboard .lb-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.62rem; font-weight: 700;
+      color: #ff4444; letter-spacing: 2px;
+      text-align: center; text-transform: uppercase;
+      margin-bottom: 10px; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,68,68,0.2);
+    }
+    #lb-list { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0 8px; overflow: hidden; }
+
+    .lb-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+    }
+    .lb-item.player {
+      background: rgba(255,60,60,0.15);
+      border-color: rgba(255,60,60,0.4);
+      box-shadow: 0 0 10px rgba(255,60,60,0.2);
+    }
+    .lb-item .lb-rank {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem; font-weight: 900;
+      color: rgba(255,255,255,0.3); min-width: 18px;
+    }
+    .lb-item.top3 .lb-rank { color: #ffd93d; }
+    .lb-item.player .lb-rank { color: #ff7070; }
+    .lb-item .lb-car { font-size: 0.9rem; }
+    .lb-item .lb-name {
+      font-size: 0.65rem; font-weight: 700;
+      color: rgba(255,255,255,0.7);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1;
+    }
+    .lb-item.player .lb-name { color: #ff9090; }
+    .lb-item.bump-up { animation: bumpUp 0.5s ease; }
+    .lb-item.bump-down { animation: bumpDown 0.5s ease; }
+
+    @keyframes bumpUp {
+      0% { transform: translateY(0); background: rgba(80,255,120,0.2); }
+      50% { transform: translateY(-4px); background: rgba(80,255,120,0.3); }
+      100% { transform: translateY(0); background: rgba(255,60,60,0.15); }
+    }
+    @keyframes bumpDown {
+      0% { transform: translateY(0); background: rgba(255,80,80,0.3); }
+      50% { transform: translateY(4px); background: rgba(255,80,80,0.4); }
+      100% { transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════
+       HUD (top bar)
+    ══════════════════════════════════════════ */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 170px;
+      z-index: 200;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 16px 10px 130px;
+      background: linear-gradient(180deg, rgba(4,10,24,0.97) 0%, rgba(4,10,24,0) 100%);
+      pointer-events: none;
+    }
+    .hud-stat {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+    }
+    .hud-stat .hud-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.5rem; letter-spacing: 2px; color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+    }
+    .hud-stat .hud-val {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem; font-weight: 900; color: #fff;
+    }
+    #hud-speed .hud-val { color: #50e0ff; }
+    #hud-lap .hud-val { color: #ffd93d; }
+    #hud-score .hud-val { color: #80ff99; }
+
+    /* ══════════════════════════════════════════
+       VOICE PROMPT OVERLAY
+    ══════════════════════════════════════════ */
+    #voice-prompt {
+      position: fixed;
+      left: 50%; transform: translateX(-50%) translateX(-85px);
+      bottom: 130px;
+      z-index: 500;
+      background: rgba(4,10,24,0.97);
+      border: 1px solid rgba(255,220,0,0.5);
+      border-radius: 16px;
+      padding: 14px 20px;
+      min-width: 260px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(255,200,0,0.2);
+      display: none;
+      flex-direction: column; gap: 10px;
+    }
+    #voice-prompt.active { display: flex; }
+    #vp-phrase {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem; font-weight: 700;
+      color: #ffd93d;
+      line-height: 1.4;
+    }
+    #vp-translation { font-size: 0.72rem; color: rgba(255,255,255,0.45); }
+    #vp-timer-bar-wrap {
+      width: 100%; height: 5px;
+      background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;
+    }
+    #vp-timer-bar {
+      height: 100%; background: #ffd93d;
+      border-radius: 10px; transition: width 0.1s linear;
+    }
+    /* vp-buttons removed — real speech recognition handles input */
+
+    /* ══════════════════════════════════════════
+       LISTENING INDICATOR
+    ══════════════════════════════════════════ */
+    #listening-badge {
+      position: fixed;
+      left: 50%; transform: translateX(-50%) translateX(-85px);
+      bottom: 90px; z-index: 500;
+      display: none; align-items: center; gap: 8px;
+      background: rgba(80,232,121,0.15);
+      border: 1px solid rgba(80,232,121,0.4);
+      border-radius: 50px;
+      padding: 5px 14px;
+      font-size: 0.75rem; font-weight: 700; color: #80ffaa;
+    }
+    #listening-badge.active { display: flex; }
+    .mic-pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #50e879; animation: micPulse 0.8s ease-in-out infinite;
+    }
+    @keyframes micPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.6; } }
+
+    /* ══════════════════════════════════════════
+       RESULT FLASH
+    ══════════════════════════════════════════ */
+    #result-flash {
+      position: fixed;
+      left: 50%; transform: translateX(-50%) translateX(-85px);
+      top: 50%; margin-top: -30px;
+      z-index: 600;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.6rem; font-weight: 900;
+      pointer-events: none;
+      display: none;
+    }
+    #result-flash.show { display: block; animation: flashAnim 0.9s ease forwards; }
+    @keyframes flashAnim {
+      0% { opacity: 0; transform: translateX(-50%) translateX(-85px) scale(0.5); }
+      20% { opacity: 1; transform: translateX(-50%) translateX(-85px) scale(1.1); }
+      80% { opacity: 1; transform: translateX(-50%) translateX(-85px) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) translateX(-85px) scale(0.8); }
+    }
+    #result-flash.success { color: #50e879; text-shadow: 0 0 20px #50e879; }
+    #result-flash.fail { color: #ff4444; text-shadow: 0 0 20px #ff4444; }
+
+    /* ══════════════════════════════════════════
+       START / GAME OVER SCREENS
+    ══════════════════════════════════════════ */
+    .screen-overlay {
+      position: fixed; inset: 0;
+      background: rgba(4,10,24,0.92);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 800; gap: 18px;
+      text-align: center;
+    }
+    .screen-overlay .so-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.2rem; font-weight: 900;
+      color: #ff4444; text-shadow: 0 0 30px rgba(255,68,68,0.6);
+    }
+    .screen-overlay .so-sub {
+      font-size: 1rem; color: rgba(255,255,255,0.5); max-width: 360px; line-height: 1.6;
+    }
+    .screen-overlay .so-stat {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.4rem; font-weight: 700; color: #ffd93d;
+    }
+    .so-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700; font-size: 0.85rem; letter-spacing: 1px;
+      padding: 12px 32px; border-radius: 50px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #ff2222, #ff6600);
+      color: #fff;
+      box-shadow: 0 0 28px rgba(255,60,0,0.4);
+      transition: all 0.2s;
+    }
+    .so-btn:hover { transform: scale(1.05); box-shadow: 0 0 42px rgba(255,60,0,0.6); }
+    .flag-row { font-size: 2.5rem; letter-spacing: 8px; }
+
+    /* countdown */
+    #countdown {
+      position: fixed; inset: 0;
+      background: rgba(4,10,24,0.8);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 799; pointer-events: none;
+    }
+    #countdown-num {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 8rem; font-weight: 900;
+      color: #ffd93d; text-shadow: 0 0 60px rgba(255,217,61,0.8);
+      animation: countPop 0.8s ease;
+    }
+    @keyframes countPop {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── BACK BUTTON ── -->
+<a href="../../play.html" class="menu-btn">← Menu</a>
+
+<!-- ── HUD ── -->
+<div id="hud">
+  <div class="hud-stat" id="hud-speed"><div class="hud-label">Speed</div><div class="hud-val" id="hud-speed-val">280</div></div>
+  <div class="hud-stat" id="hud-lap"><div class="hud-label">Lap</div><div class="hud-val" id="hud-lap-val">1 / 3</div></div>
+  <div class="hud-stat" id="hud-lives"><div class="hud-label">Lives</div><div class="hud-val" id="hud-lives-val">❤️❤️❤️</div></div>
+  <div class="hud-stat" id="hud-score"><div class="hud-label">Score</div><div class="hud-val" id="hud-score-val">0</div></div>
+</div>
+
+<!-- ── LEADERBOARD ── -->
+<div id="leaderboard">
+  <div class="lb-title">🏁 Race</div>
+  <div id="lb-list"></div>
+</div>
+
+<!-- ── CANVAS ── -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ── VOICE PROMPT ── -->
+<div id="voice-prompt">
+  <div id="vp-phrase">the cat sleeps all day</div>
+  <div id="vp-translation">кошка спит весь день</div>
+  <div id="vp-timer-bar-wrap"><div id="vp-timer-bar" style="width:100%"></div></div>
+</div>
+
+<!-- ── LISTENING BADGE ── -->
+<div id="listening-badge">
+  <div class="mic-pulse"></div>
+  Listening...
+</div>
+
+<!-- ── RESULT FLASH ── -->
+<div id="result-flash"></div>
+
+<!-- ── COUNTDOWN ── -->
+<div id="countdown" style="display:none;">
+  <div id="countdown-num">3</div>
+</div>
+
+<!-- ── START SCREEN ── -->
+<div class="screen-overlay" id="start-screen">
+  <div class="flag-row">🏎️🏁</div>
+  <div class="so-title">VOICE F1<br>OVERTAKE</div>
+  <div class="so-sub">An enemy car blocks your lane! Say the phrase before the timer runs out to dodge and overtake!</div>
+  <button class="so-btn" id="start-btn">▶ START RACE</button>
+</div>
+
+<!-- ── GAME OVER SCREEN ── -->
+<div class="screen-overlay" id="gameover-screen" style="display:none;">
+  <div class="flag-row">🏁🏁🏁</div>
+  <div class="so-title" id="go-title">RACE OVER</div>
+  <div class="so-sub" id="go-sub">Race complete!</div>
+  <div class="so-stat" id="go-score">Score: 0</div>
+  <button class="so-btn" id="restart-btn">🔄 RESTART</button>
+  <a href="../../play.html" class="so-btn" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);box-shadow:none;border:1px solid rgba(255,255,255,0.1);">← Menu</a>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SHARED SCRIPTS — WordList & Utils
+     ══════════════════════════════════════════
+     INJECT POINT: Replace these two script tags with your real bundled versions
+     when integrating into the production build.
+-->
+<script src="../shared/wordlists.js"></script>
+<script src="../shared/utils.js"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   WORD LIST INTEGRATION POINT
+   ══════════════════════════════════════════════════════════════════
+   getWordList() reads sentences from the currently selected topic
+   via the shared VG_TOPICS object (from wordlists.js).
+   Falls back to a built-in list if the shared module isn't loaded.
+   To inject a different list, modify getWordList() below.
+*/
+function getWordList() {
+  try {
+    // Read selected topic via shared helpers (handles built-in AND custom topics)
+    if (typeof vgGetSelectedTopic === 'function' && typeof vgGetTopic === 'function') {
+      const selected = vgGetSelectedTopic();
+      const topic = vgGetTopic(selected);
+      if (topic && topic.sentences && topic.sentences.length > 0) {
+        return topic.sentences;
+      }
+    }
+  } catch(e) {}
+  // Built-in fallback list
+  return [
+    { text: 'the cat sleeps all day',    ru: 'кошка спит весь день',         alts: ['the cat sleeps all day', 'cat sleeps all day'] },
+    { text: 'cast the spell',            ru: 'произнести заклинание',         alts: ['cast the spell', 'cast a spell'] },
+    { text: 'fire ball strike',          ru: 'удар огненным шаром',           alts: ['fire ball strike', 'fireball strike'] },
+    { text: 'the dog runs fast',         ru: 'собака бежит быстро',           alts: ['the dog runs fast', 'dog runs fast'] },
+    { text: 'wolves hunt in packs',      ru: 'волки охотятся стаями',         alts: ['wolves hunt in packs', 'wolf hunt in packs'] },
+    { text: 'monkeys climb the trees',   ru: 'обезьяны лазают по деревьям',   alts: ['monkeys climb the trees', 'monkey climb trees'] },
+    { text: 'the bear eats honey',       ru: 'медведь ест мёд',               alts: ['the bear eats honey', 'bear eats honey'] },
+    { text: 'elephants are very big',    ru: 'слоны очень большие',           alts: ['elephants are very big', 'elephant very big'] },
+    { text: 'heal my wounds',            ru: 'исцели мои раны',               alts: ['heal my wounds', 'heal wounds'] },
+    { text: 'rise and shine',            ru: 'вставай и сияй',                alts: ['rise and shine', 'rise shine'] },
+  ];
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WEB SPEECH API — REAL VOICE RECOGNITION
+   ══════════════════════════════════════════════════════════════════
+   validateVoiceCommand(expectedPhrase, callback)
+     - Starts the microphone automatically when the prompt appears.
+     - callback(true)  → player said the phrase correctly → overtake.
+     - callback(false) → phrase not recognised → crash.
+     - stopVoiceCommand() aborts the recognition when the prompt closes
+       (timeout or game-over), ensuring the mic is released immediately.
+*/
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _recognition = null;
+let _voiceCallback = null;
+
+function validateVoiceCommand(phraseObj, callback) {
+  _voiceCallback = callback;
+  document.getElementById('listening-badge').classList.add('active');
+
+  if (!SpeechRecognition) {
+    // Browser doesn't support speech recognition — just wait for timeout
+    console.warn('VoiceF1: SpeechRecognition not supported in this browser.');
+    return;
+  }
+
+  // Abort any leftover recognition session
+  if (_recognition) { try { _recognition.abort(); } catch(e) {} }
+
+  const recognition = new SpeechRecognition();
+  _recognition = recognition;
+  recognition.lang             = 'en-US';
+  recognition.interimResults   = false;
+  recognition.maxAlternatives  = 5;
+  recognition.continuous       = false;
+
+  recognition.onresult = (event) => {
+    if (!_voiceCallback) return;
+    // Collect all alternative transcripts for fuzzy matching
+    const alts = [];
+    for (let i = 0; i < event.results[0].length; i++) {
+      alts.push(event.results[0][i].transcript.toLowerCase().trim());
+    }
+    const matched = (typeof phraseMatches === 'function')
+      ? phraseMatches(alts, phraseObj)
+      : alts.some(a => phraseObj.alts && phraseObj.alts.some(ref => a.includes(ref.toLowerCase())));
+    const cb = _voiceCallback;
+    _voiceCallback = null;
+    _recognition   = null;
+    cb(matched);
+  };
+
+  recognition.onerror = (event) => {
+    // 'no-speech' and 'aborted' are normal — don't crash the game, just wait for timeout
+    console.warn('VoiceF1: speech error', event.error);
+    if (event.error === 'aborted') return;
+    // On any real error restart listening so the player keeps getting chances
+    if (_voiceCallback && event.error === 'no-speech') {
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  recognition.onend = () => {
+    // If we still have a pending callback (no result yet), restart so mic stays open
+    if (_voiceCallback && _recognition === recognition) {
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  try { recognition.start(); } catch(e) { console.warn('VoiceF1: could not start recognition', e); }
+}
+
+function stopVoiceCommand() {
+  _voiceCallback = null;
+  if (_recognition) { try { _recognition.abort(); } catch(e) {} _recognition = null; }
+  document.getElementById('listening-badge').classList.remove('active');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME CONSTANTS
+══════════════════════════════════════════════════════════════════ */
+const CANVAS_W = 420;
+const CANVAS_H = window.innerHeight;
+const TRACK_LEFT  = 60;   // px from canvas left
+const TRACK_RIGHT = CANVAS_W - 60;
+const TRACK_W = TRACK_RIGHT - TRACK_LEFT;
+
+const LANES = 3;
+const LANE_W = TRACK_W / LANES;
+
+// Pixels per second for road scroll (increases over time)
+let ROAD_SPEED = 320;
+const MAX_ROAD_SPEED = 680;
+
+const PROMPT_DISTANCE = 360; // px ahead — shows prompt (increased for ~3s extra window)
+const COLLISION_Y     = CANVAS_H - 160; // player car top edge when collision triggers
+
+const PROMPT_TIME   = 5000; // ms to say the phrase (5s total window)
+const OVERTAKE_TIME = 800;  // ms dodge animation
+const CRASH_TIME    = 600;  // ms crash animation
+
+const AI_RACERS = ['SpeedyPro','Alex2015','NinjaRacer','TurboMax','Flash_99','Velocity','DriftKing','IceBlaze'];
+const PLAYER_NAME = 'YOU';
+
+/* ══════════════════════════════════════════════════════════════════
+   CANVAS & CONTEXT
+══════════════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = CANVAS_W;
+  canvas.height = window.innerHeight;
+  canvas.style.width  = CANVAS_W + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  canvas.style.marginRight = '170px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME STATE
+══════════════════════════════════════════════════════════════════ */
+let gameState = 'start'; // 'start' | 'countdown' | 'running' | 'gameover'
+let score  = 0;
+let lap    = 1;
+const TOTAL_LAPS = 3;
+let overtakes = 0;
+let crashes   = 0;
+let lives     = 3;
+const MAX_LIVES = 3;
+
+// Road scroll
+let roadOffset = 0;
+const DASHES  = [];
+const DASH_H  = 60; const DASH_GAP = 50; const DASH_W = 4;
+
+// Player car
+let playerLane   = 1; // 0,1,2
+let playerX      = 0;
+let playerY      = 0;
+let playerSpeed  = 280;
+let playerDodging = false;
+let playerCrashing = false;
+let dodgeProgress  = 0; // 0..1
+let crashShake     = 0;
+let targetLane     = 1;
+let dodgeFromX     = 0; let dodgeToX = 0;
+
+// Enemy cars
+const enemies = [];
+let enemySpawnTimer = 0;
+const ENEMY_SPAWN_INTERVAL = 2800; // ms
+
+// Prompt state
+let promptActive   = false;
+let promptPhrase   = null;
+let promptTimer    = 0;
+let promptEnemy    = null;
+
+// Sparks
+const sparks = [];
+
+// Leaderboard state
+const lbRacers = [];
+let lbPlayerIdx = 0;
+let aiSwapTimer = 0;
+
+/* ══════════════════════════════════════════════════════════════════
+   HELPER: Lane center X
+══════════════════════════════════════════════════════════════════ */
+function laneX(lane) {
+  return TRACK_LEFT + LANE_W * lane + LANE_W / 2;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LEADERBOARD INIT & UPDATE
+══════════════════════════════════════════════════════════════════ */
+function initLeaderboard() {
+  lbRacers.length = 0;
+  const cars = ['🔴','🟠','🟡','🟢','🔵','🟣','⚫','🟤'];
+  for (let i = 0; i < AI_RACERS.length; i++) {
+    lbRacers.push({ name: AI_RACERS[i], car: cars[i % cars.length], isPlayer: false });
+  }
+  // Insert player somewhere in the middle
+  lbPlayerIdx = Math.floor(AI_RACERS.length / 2);
+  lbRacers.splice(lbPlayerIdx, 0, { name: PLAYER_NAME, car: '🏎️', isPlayer: true });
+  renderLeaderboard();
+}
+
+function getPlayerLbIdx() {
+  return lbRacers.findIndex(r => r.isPlayer);
+}
+
+function leaderboardMovePlayer(delta) {
+  const idx = getPlayerLbIdx();
+  const newIdx = Math.max(0, Math.min(lbRacers.length - 1, idx + delta));
+  if (newIdx === idx) return;
+  const [item] = lbRacers.splice(idx, 1);
+  lbRacers.splice(newIdx, 0, item);
+  renderLeaderboard(delta < 0 ? 'up' : 'down');
+}
+
+function leaderboardSwapAI() {
+  // Pick two random AI racers and swap them
+  const aiIdxs = lbRacers.map((r,i) => r.isPlayer ? -1 : i).filter(i => i >= 0);
+  if (aiIdxs.length < 2) return;
+  const a = aiIdxs[Math.floor(Math.random() * aiIdxs.length)];
+  let b = a;
+  while (b === a) b = aiIdxs[Math.floor(Math.random() * aiIdxs.length)];
+  const tmp = lbRacers[a];
+  lbRacers[a] = lbRacers[b];
+  lbRacers[b] = tmp;
+  renderLeaderboard();
+}
+
+function renderLeaderboard(playerAnim = null) {
+  const list = document.getElementById('lb-list');
+  list.innerHTML = '';
+  lbRacers.forEach((racer, i) => {
+    const div = document.createElement('div');
+    div.className = 'lb-item' + (racer.isPlayer ? ' player' : '') + (i < 3 ? ' top3' : '');
+    if (racer.isPlayer && playerAnim === 'up')   div.classList.add('bump-up');
+    if (racer.isPlayer && playerAnim === 'down') div.classList.add('bump-down');
+    div.innerHTML = `<span class="lb-rank">${i+1}</span><span class="lb-car">${racer.car}</span><span class="lb-name">${racer.name}</span>`;
+    list.appendChild(div);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ENEMY SPAWNING
+══════════════════════════════════════════════════════════════════ */
+const ENEMY_COLORS = ['#062c13','#c58e00','#004c9a'];
+const ENEMY_CARS_EMO = ['🚗','🚕','🚙','🏎️'];
+
+function spawnEnemy() {
+  const lane = Math.floor(Math.random() * LANES);
+  // Don't stack two enemies in same lane too close
+  const existing = enemies.filter(e => e.lane === lane);
+  if (existing.some(e => e.y > -100)) return;
+
+  const phrase = getWordList()[Math.floor(Math.random() * getWordList().length)];
+  enemies.push({
+    lane,
+    x: laneX(lane),
+    y: -80,
+    color: ENEMY_COLORS[Math.floor(Math.random() * ENEMY_COLORS.length)],
+    w: 38, h: 72,
+    speed: ROAD_SPEED * 0.45, // enemy is slower
+    phrase,
+    promptShown: false,
+    crashed: false,
+    overtaken: false,
+    alpha: 1,
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SPARK PARTICLES
+══════════════════════════════════════════════════════════════════ */
+function spawnSparks(x, y) {
+  for (let i = 0; i < 24; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 120 + Math.random() * 280;
+    sparks.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 80,
+      life: 1,
+      color: Math.random() > 0.5 ? '#ffaa00' : '#ff4400',
+      r: 2 + Math.random() * 3,
+    });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SHOW / HIDE VOICE PROMPT
+══════════════════════════════════════════════════════════════════ */
+function showPrompt(phrase) {
+  promptActive = true;
+  promptPhrase = phrase;
+  promptTimer  = PROMPT_TIME;
+
+  document.getElementById('vp-phrase').textContent = phrase.text;
+  document.getElementById('vp-translation').textContent = phrase.ru || '';
+  document.getElementById('vp-timer-bar').style.width = '100%';
+  document.getElementById('vp-timer-bar').style.background = '#ffd93d';
+  document.getElementById('voice-prompt').classList.add('active');
+
+  // Pass the full phrase object so validateVoiceCommand can do fuzzy matching
+  validateVoiceCommand(phrase, handleVoiceResult);
+}
+
+function hidePrompt() {
+  promptActive = false;
+  document.getElementById('voice-prompt').classList.remove('active');
+  stopVoiceCommand(); // stop mic + remove listening badge
+}
+
+function handleVoiceResult(success) {
+  if (!promptActive) return;
+  hidePrompt();
+  if (success) {
+    doOvertake();
+  } else {
+    doCrash();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   OVERTAKE & CRASH LOGIC
+══════════════════════════════════════════════════════════════════ */
+function doOvertake() {
+  overtakes++;
+  score += 50;
+  document.getElementById('hud-score-val').textContent = score;
+
+  showResultFlash('OVERTAKE! +50', 'success');
+
+  // Find an empty lane to dodge into
+  const occupied = enemies.map(e => e.lane);
+  let dodgeLane = playerLane;
+  const options = [0,1,2].filter(l => l !== playerLane);
+  for (const l of options) {
+    if (!occupied.includes(l)) { dodgeLane = l; break; }
+  }
+  if (dodgeLane === playerLane) dodgeLane = options[Math.floor(Math.random() * options.length)];
+
+  playerDodging  = true;
+  dodgeProgress  = 0;
+  dodgeFromX     = playerX;
+  targetLane     = dodgeLane;
+  dodgeToX       = laneX(dodgeLane);
+
+  // Mark enemy as overtaken
+  if (promptEnemy) promptEnemy.overtaken = true;
+  promptEnemy = null;
+
+  leaderboardMovePlayer(-1); // move UP (lower index = better position)
+  playerLane = dodgeLane;
+}
+
+function doCrash() {
+  crashes++;
+  score = Math.max(0, score - 20);
+  document.getElementById('hud-score-val').textContent = score;
+  lives = Math.max(0, lives - 1);
+  document.getElementById('hud-lives-val').textContent = '❤️'.repeat(lives) + '🖤'.repeat(MAX_LIVES - lives);
+
+  showResultFlash('CRASH! -20', 'fail');
+  spawnSparks(playerX, playerY + 36);
+  playerCrashing = true;
+  crashShake = 12;
+  if (promptEnemy) { promptEnemy.crashed = true; promptEnemy = null; }
+
+  leaderboardMovePlayer(2); // move DOWN
+  // Knock the player into a random adjacent lane so it doesn't sit stuck on the enemy car
+  const crashOptions = [0,1,2].filter(l => l !== playerLane);
+  const crashLane = crashOptions[Math.floor(Math.random() * crashOptions.length)];
+  dodgeFromX = playerX;
+  dodgeToX   = laneX(crashLane);
+  playerLane = crashLane;
+  playerDodging = true;
+  dodgeProgress = 0;
+  if (lives <= 0) { endGame(); }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESULT FLASH
+══════════════════════════════════════════════════════════════════ */
+function showResultFlash(text, type) {
+  const el = document.getElementById('result-flash');
+  el.textContent = text;
+  el.className = '';
+  void el.offsetWidth;
+  el.classList.add('show', type);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DRAWING HELPERS
+══════════════════════════════════════════════════════════════════ */
+function drawRoad() {
+  const ch = canvas.height;
+
+  // Asphalt base
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(TRACK_LEFT, 0, TRACK_W, ch);
+
+  // Kerbs (striped edges)
+  const kerbW = 18;
+  for (let y = -60; y < ch + 60; y += 40) {
+    const ro = roadOffset % 80;
+    const even = Math.floor((y + ro) / 40) % 2 === 0;
+    ctx.fillStyle = even ? '#cc0000' : '#ffffff';
+    ctx.fillRect(TRACK_LEFT - kerbW, y + (ro % 40) - 40, kerbW, 40);
+    ctx.fillStyle = even ? '#cc0000' : '#ffffff';
+    ctx.fillRect(TRACK_RIGHT, y + (ro % 40) - 40, kerbW, 40);
+  }
+
+  // Lane dividers (dashed)
+  ctx.setLineDash([DASH_H, DASH_GAP]);
+  ctx.lineWidth = DASH_W;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  for (let l = 1; l < LANES; l++) {
+    const x = TRACK_LEFT + LANE_W * l;
+    ctx.lineDashOffset = -(roadOffset % (DASH_H + DASH_GAP));
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, ch);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function drawCar(x, y, color, w, h, isPlayer, alpha = 1, shake = 0) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const sx = shake > 0 ? x + (Math.random() - 0.5) * shake : x;
+  const cx = sx - w / 2;
+  const cy = y;
+
+  const sprite = isPlayer ? CAR_SPRITES.player : (CAR_SPRITES[color] || CAR_SPRITES.player);
+
+  ctx.shadowColor = color;
+  ctx.shadowBlur = isPlayer ? 20 : 10;
+
+  if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+    ctx.drawImage(sprite, cx, cy, w, h);
+  }
+
+  ctx.restore();
+}
+
+// ── CAR SPRITES ─────────────────────────────────────────────────
+const CAR_SPRITE_SRCS = {
+  player: 'car-red.png',
+  '#062c13': 'car-green.png',
+  '#c58e00': 'car-yellow.png',
+  '#004c9a': 'car-blue.png',
+};
+const CAR_SPRITES = {};
+Object.entries(CAR_SPRITE_SRCS).forEach(([key, src]) => {
+  const img = new Image();
+  img.src = src;
+  CAR_SPRITES[key] = img;
+});
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function lightenColor(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (n >> 16) + amt);
+  const g = Math.min(255, ((n >> 8) & 0xff) + amt);
+  const b = Math.min(255, (n & 0xff) + amt);
+  return `rgb(${r},${g},${b})`;
+}
+function darkenColor(hex, amt) { return lightenColor(hex, -amt); }
+
+function drawSparks(dt) {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x  += s.vx * dt;
+    s.y  += s.vy * dt;
+    s.vy += 500 * dt; // gravity
+    s.life -= dt * 2;
+    if (s.life <= 0) { sparks.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = s.life;
+    ctx.fillStyle   = s.color;
+    ctx.shadowColor = s.color; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * s.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawPromptBubble(enemy) {
+  if (!promptActive || !promptPhrase) return;
+  // Draw a little speech bubble above the enemy car on canvas
+  const bx = enemy.x;
+  const by = enemy.y - 20;
+  const phrase = promptPhrase.text;
+  ctx.save();
+  ctx.font = 'bold 11px Nunito, sans-serif';
+  const tw = ctx.measureText(phrase).width;
+  const pw = tw + 20; const ph = 24; const pr = 8;
+  ctx.fillStyle = 'rgba(255,217,61,0.95)';
+  ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 12;
+  roundRect(ctx, bx - pw / 2, by - ph, pw, ph, pr);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(phrase, bx, by - ph / 2);
+  ctx.restore();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MAIN UPDATE
+══════════════════════════════════════════════════════════════════ */
+let lastTime = 0;
+
+function update(ts) {
+  if (gameState !== 'running') return;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  // Slow down gameplay while a voice prompt is active (bullet-time effect)
+  const moveDt = promptActive ? dt * 0.2 : dt;
+
+  // Gradually increase road speed
+  ROAD_SPEED = Math.min(MAX_ROAD_SPEED, ROAD_SPEED + moveDt * 8);
+  playerSpeed = ROAD_SPEED;
+  document.getElementById('hud-speed-val').textContent = Math.round(playerSpeed);
+
+  // Road scroll
+  roadOffset += ROAD_SPEED * moveDt;
+
+  // Enemy spawn
+  enemySpawnTimer += dt * 1000;
+  if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL && !promptActive) {
+    enemySpawnTimer = 0;
+    spawnEnemy();
+  }
+
+  // Player dodge animation
+  if (playerDodging) {
+    dodgeProgress += dt / (OVERTAKE_TIME / 1000);
+    const t = easeInOut(Math.min(dodgeProgress, 1));
+    playerX = dodgeFromX + (dodgeToX - dodgeFromX) * t;
+    if (dodgeProgress >= 1) { playerDodging = false; playerX = dodgeToX; }
+  }
+
+  // Player crash shake
+  if (playerCrashing) {
+    crashShake = Math.max(0, crashShake - dt * 40);
+    if (crashShake <= 0) { playerCrashing = false; }
+  }
+
+  // Update enemies
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    // Freeze the car currently being challenged so it can't reach/overlap
+    // the player until its prompt is resolved; everything else moves in slow-mo.
+    if (promptActive && promptEnemy === e) {
+      // creep forward slowly instead of freezing outright, but far slower
+      // than everything else so it can't reach the player before the timer ends
+      e.y += (ROAD_SPEED - e.speed) * moveDt * 0.15;
+    } else {
+      e.y += (ROAD_SPEED - e.speed) * moveDt;
+    }
+
+    // Check if this enemy should trigger the prompt
+    if (!promptActive && !e.promptShown && !e.overtaken && !e.crashed) {
+      if (e.lane === playerLane) {
+        const dist = (playerY) - (e.y + e.h);
+        if (dist < PROMPT_DISTANCE && dist > 0) {
+          e.promptShown = true;
+          promptEnemy   = e;
+          showPrompt(e.phrase);
+        }
+      }
+    }
+
+    // Prompt timer countdown
+    if (promptActive && promptEnemy === e) {
+      promptTimer -= dt * 1000;
+      const frac = Math.max(0, promptTimer / PROMPT_TIME);
+      document.getElementById('vp-timer-bar').style.width = (frac * 100) + '%';
+      document.getElementById('vp-timer-bar').style.background = frac > 0.4 ? '#ffd93d' : '#ff4444';
+      if (promptTimer <= 0) {
+        // Timeout = fail
+        if (_voiceCallback) { _voiceCallback(false); } else { handleVoiceResult(false); }
+      }
+    }
+
+    // Remove off-screen
+    if (e.y > canvas.height + 100) { enemies.splice(i, 1); }
+
+    // Fade overtaken cars
+    if (e.overtaken) {
+      e.alpha = Math.max(0, e.alpha - dt * 1.5);
+      if (e.alpha <= 0) { enemies.splice(i, 1); }
+    }
+  }
+
+  // AI leaderboard shuffle
+  aiSwapTimer += dt * 1000;
+  if (aiSwapTimer > 4000 + Math.random() * 3000) {
+    aiSwapTimer = 0;
+    leaderboardSwapAI();
+  }
+
+  // Lap counter (based on score milestones)
+  const newLap = Math.min(TOTAL_LAPS, 1 + Math.floor(overtakes / 5));
+  if (newLap !== lap) {
+    lap = newLap;
+    document.getElementById('hud-lap-val').textContent = `${lap} / ${TOTAL_LAPS}`;
+    if (lap > TOTAL_LAPS) endGame();
+  }
+
+  // End game after enough overtakes
+  if (overtakes >= 15) endGame();
+}
+
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+/* ══════════════════════════════════════════════════════════════════
+   MAIN DRAW
+══════════════════════════════════════════════════════════════════ */
+function draw() {
+  const ch = canvas.height;
+  ctx.clearRect(0, 0, canvas.width, ch);
+
+  // Sky / bg
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, ch);
+  skyGrad.addColorStop(0, '#060a14');
+  skyGrad.addColorStop(1, '#0a1020');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, canvas.width, ch);
+
+  // Road
+  drawRoad();
+
+  // Enemy cars
+  for (const e of enemies) {
+    if (!e.overtaken || e.alpha > 0) {
+      drawCar(e.x, e.y, e.color, e.w, e.h, false, e.alpha);
+      if (promptEnemy === e && promptActive) drawPromptBubble(e);
+    }
+  }
+
+  // Player car
+  const shakeAmt = playerCrashing ? crashShake : 0;
+  drawCar(playerX, playerY, '#ff2222', 40, 76, true, 1, shakeAmt);
+
+  // Sparks
+  drawSparks(0.016); // fixed dt for sparks visual
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME LOOP
+══════════════════════════════════════════════════════════════════ */
+function loop(ts) {
+  update(ts);
+  // Update spark life separately with fixed dt since sparks are in draw
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    sparks[i].life -= 0.016 * 2;
+    if (sparks[i].life <= 0) sparks.splice(i, 1);
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME FLOW
+══════════════════════════════════════════════════════════════════ */
+function initGame() {
+  score     = 0; overtakes = 0; crashes = 0; lap = 1;
+  ROAD_SPEED = 320;
+  enemies.length = 0; sparks.length = 0;
+  playerLane    = 1; playerDodging = false; playerCrashing = false;
+  promptActive  = false; promptEnemy = null;
+  enemySpawnTimer = 0; aiSwapTimer = 0;
+  promptTimer = 0;
+
+  playerX = laneX(playerLane);
+  playerY = canvas.height - 180;
+
+  document.getElementById('hud-score-val').textContent = '0';
+  document.getElementById('hud-speed-val').textContent = '280';
+  document.getElementById('hud-lap-val').textContent  = '1 / 3';
+  lives = MAX_LIVES;
+  document.getElementById('hud-lives-val').textContent = '❤️'.repeat(MAX_LIVES);
+
+  initLeaderboard();
+}
+
+function startCountdown(cb) {
+  const el  = document.getElementById('countdown');
+  const num = document.getElementById('countdown-num');
+  el.style.display = 'flex';
+  const steps = ['3','2','1','GO!'];
+  let i = 0;
+  function step() {
+    num.textContent = steps[i];
+    num.style.animation = 'none';
+    void num.offsetWidth;
+    num.style.animation = 'countPop 0.8s ease';
+    i++;
+    if (i < steps.length) setTimeout(step, 800);
+    else setTimeout(() => { el.style.display = 'none'; cb(); }, 700);
+  }
+  step();
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display    = 'none';
+  document.getElementById('gameover-screen').style.display = 'none';
+  initGame();
+  startCountdown(() => {
+    gameState = 'running';
+    lastTime  = performance.now();
+  });
+}
+
+function endGame() {
+  gameState = 'gameover';
+  hidePrompt();
+  // Save score
+  if (typeof VG !== 'undefined') VG.saveScore('voice-f1', score);
+
+  const playerPos = getPlayerLbIdx() + 1;
+  document.getElementById('go-title').textContent = playerPos === 1 ? '🏆 CHAMPION!' : `P${playerPos} FINISH`;
+  document.getElementById('go-sub').textContent   = `Overtakes: ${overtakes}  •  Crashes: ${crashes}`;
+  document.getElementById('go-score').textContent = `Score: ${score}`;
+  document.getElementById('gameover-screen').style.display = 'flex';
+}
+
+/* Mock buttons removed — real SpeechRecognition is used instead */
+
+/* ══════════════════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════════════════ */
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+/* ══════════════════════════════════════════════════════════════════
+   BOOTSTRAP
+══════════════════════════════════════════════════════════════════ */
+initGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
